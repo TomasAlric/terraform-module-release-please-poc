@@ -13,3 +13,7 @@ Abra um PR para main. Use um título como `fix: corrigir validação DNS` ou `fe
 Depois do merge, o Release Please reconcilia o histórico, reúne as mudanças elegíveis num PR com a versão e o changelog e publica a GitHub Release após o merge desse PR. O GitHub pode exigir autorização humana para iniciar o CI do PR criado pelo token do workflow. O repositório tem um único mantenedor e exige CI. CODEOWNERS identifica o responsável.
 
 Consulte os resultados e SHAs no [relatório de homologação](docs/validation-report.md), a [arquitetura](docs/architecture.md) e o [procedimento de operação](docs/release-management.md).
+
+## Migração para 7.x
+
+Troque o argumento de entrada `capacity_type` por `capacity_model` no bloco module. Os valores ON_DEMAND e SPOT continuam aceitos. O campo de saída `cluster.capacity_type` conserva o nome para leitores do contrato.

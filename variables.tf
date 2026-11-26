@@ -37,12 +37,12 @@ variable "architecture" {
   }
 }
 
-variable "capacity_type" {
+variable "capacity_model" {
   type     = string
   nullable = false
   default  = "ON_DEMAND"
   validation {
-    condition     = contains(["ON_DEMAND", "SPOT"], var.capacity_type)
+    condition     = contains(["ON_DEMAND", "SPOT"], var.capacity_model)
     error_message = "Use ON_DEMAND ou SPOT."
   }
 }

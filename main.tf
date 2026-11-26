@@ -4,7 +4,7 @@ locals {
     version              = var.cluster_version
     bottlerocket_version = var.bottlerocket_version
     architecture         = var.architecture
-    capacity_type        = var.capacity_type
+    capacity_type        = var.capacity_model
     addons               = var.addons
     addon_channels       = var.addon_channels
     tags                 = var.tags
