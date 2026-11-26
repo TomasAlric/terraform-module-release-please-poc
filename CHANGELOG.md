@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.0.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.0.0...v7.0.1) (2026-11-26)
+
+
+### Correções
+
+* preserve SemVer build metadata in Bottlerocket versions ([#19](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/19)) ([1566b4b](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/1566b4b09c78cf4c7e2bb26bc82393b9c13bc6cb))
+
 ## [7.0.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.3.0...v7.0.0) (2026-11-26)
 
 
