@@ -22,7 +22,7 @@ Snapshot de 26/11/2026 UTC. Todos os links referem-se ao repositório público p
 | H16 | PASS | Dois dispatches sobre v7.0.1 chegaram com 2 s de intervalo. Os jobs executaram 04:15:45–04:15:57 e 04:15:59–04:16:07 UTC, com árvore, tags, releases e fila de candidatos estáveis. |
 | H17 | PASS | O dispatch test_missing_token omitiu a credencial do preflight e falhou explicitamente. As etapas de escrita ficaram skipped. O secret cadastrado foi preservado. |
 
-Homologação H01–H17 abaixo. A issue de autorização #4 foi encerrada após a auditoria de v7.0.0.
+**Veredito PASS para H01–H17 e para os dois cenários do gate pré-publicação.** A issue de autorização #4 foi encerrada após a auditoria de v7.0.0.
 
 ## Evidências
 
@@ -82,3 +82,16 @@ O novo teste de nome DNS iniciado por dígito produziu 12 passes e uma falha ant
 | v7.0.1 | 6f4191d0b26545a737e5ff37ee14267139143c76 | d1ccee5653cc6c1ac703e0f09ee73c4a2c1c8a8a | 3c5bd2edb98fdcfe7f786807451bb2038ad07d72 |
 
 No histórico de atividade da branch, o pusher autenticado dos heads PAT é TomasAlric. O metadado Git do autor e committer é github-actions[bot]. O PR 12 preservou o autor github-actions[bot], o PR 20 foi aberto por TomasAlric, os runs PAT foram acionados por TomasAlric e o campo author das releases PAT é TomasAlric. Essas identidades descrevem operações diferentes. Os eventos antigos em action_required continuam no histórico.
+
+## Certificação antes da publicação
+
+O PR #22 introduziu a separação entre verificador read-only e publicador. O PR #23 acrescentou o alias OCI amd64 para exercitar uma MINOR real. O merge do release PR #24 passou pela avaliação protegida 5387247545 (PR, checks e proteção de histórico). [Implementação](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/22) · [Mudança do módulo](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/23) · [Candidato](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/24)
+
+| Experimento | Resultado | Evidência |
+|---|---|---|
+| Antes da tag, identificador de evidência divergente | PASS | O verificador encontrou um run diferente do exigido, encerrou com falha e o writer ficou skipped. A consulta git/matching-refs/tags/v7.1.0 devolveu uma lista vazia antes do retry. [Run negativo](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45821459295) |
+| Antes da tag, evidência da revisão correta | PASS | Removida a retenção experimental, o verificador autorizou o mesmo squash e a publicação ocorreu em workflow_dispatch. O asset baixado e a auditoria independente coincidiram nos três SHAs abaixo. [CI](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45821415181) · [Publicação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45821511144) · [Release e asset](https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.0) |
+
+Tag v7.1.0, candidato bcec8061ef748d0ada82924430a46a162b2e69d6, árvore certificada f1ac7cf7d06866da7ade9924cd0af240cc32b761, squash e tag 7094d1b149697f366165ea756fb6cee9dbbac1fe. A evidência registra a tentativa 1 do run 45821415181, job 139914339925, concluído em 2026-11-26T12:37:47Z. As três releases desta continuação foram auditadas e as três históricas foram revalidadas com a política de identidade atualizada.
+
+As ações negativas H15 e H17 foram experimentos controlados. No H15 o mantenedor tentou o merge comum pela CLI. A política ativa tinha lista de bypass vazia e também se aplicava ao proprietário do PAT. O workflow de release não possui etapa que realize merge. O prazo e a lista de permissões individuais do secret não foram inspecionados. A POC executou Terraform Test com provider embutido, sem autenticação ou provisionamento na AWS.
