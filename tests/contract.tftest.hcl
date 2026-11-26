@@ -82,3 +82,11 @@ run "invalid_tags" {
   }
   expect_failures = [var.tags]
 }
+
+run "invalid_trailing_hyphen" {
+  command = plan
+  variables {
+    cluster_name = "poc-"
+  }
+  expect_failures = [var.cluster_name]
+}
