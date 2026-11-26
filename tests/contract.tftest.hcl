@@ -90,3 +90,14 @@ run "invalid_trailing_hyphen" {
   }
   expect_failures = [var.cluster_name]
 }
+
+run "arm_on_demand" {
+  command = plan
+  variables {
+    architecture = "arm64"
+  }
+  assert {
+    condition     = output.cluster.architecture == "arm64" && output.cluster.capacity_type == "ON_DEMAND"
+    error_message = "ARM deve funcionar com capacidade sob demanda."
+  }
+}
