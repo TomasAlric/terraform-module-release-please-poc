@@ -2,7 +2,7 @@ variable "cluster_name" {
   type     = string
   nullable = false
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{0,62}$", var.cluster_name)) && !endswith(var.cluster_name, "-")
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,62}$", var.cluster_name)) && !endswith(var.cluster_name, "-")
     error_message = "Use um nome DNS de até 63 caracteres."
   }
 }
