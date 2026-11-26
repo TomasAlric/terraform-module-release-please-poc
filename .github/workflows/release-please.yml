@@ -1,38 +1,30 @@
 name: Release Please
-
 on:
   push:
-    branches:
-      - main
-
+    branches: [main]
   workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-
+permissions: {}
 concurrency:
-  group: release-please
+  group: release-please-main
   cancel-in-progress: false
-
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
-      - name: Release Please
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
-        uses: googleapis/release-please-action@v4
         with:
-          release-type: terraform-module
-          include-component-in-tag: false
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Release Summary
-        if: steps.release.outputs.release_created == 'true'
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      - if: always()
         env:
-          TAG_NAME: ${{ steps.release.outputs.tag_name }}
-        run: |
-          echo "## Release publicada" >> "$GITHUB_STEP_SUMMARY"
-          echo "Versão: $TAG_NAME" >> "$GITHUB_STEP_SUMMARY"
+          TAG: ${{ steps.release.outputs.tag_name }}
+          CREATED: ${{ steps.release.outputs.prs_created }}
+        run: echo "Reconciliação de $GITHUB_SHA · tag $TAG · PR atualizado $CREATED" >> "$GITHUB_STEP_SUMMARY"
