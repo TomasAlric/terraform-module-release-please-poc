@@ -32,8 +32,8 @@ variable "architecture" {
   nullable = false
   default  = "x86_64"
   validation {
-    condition     = contains(["x86_64", "arm64"], var.architecture)
-    error_message = "Use x86_64 ou arm64."
+    condition     = contains(["x86_64", "amd64", "arm64"], var.architecture)
+    error_message = "Use x86_64, amd64 ou arm64."
   }
 }
 
