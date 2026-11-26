@@ -10,7 +10,7 @@ Na raiz do checkout, execute `scripts/certify.sh`. O script verifica formataçã
 
 Abra um PR para main. Use um título como `fix: corrigir validação DNS` ou `feat: adicionar metadados opcionais`. Descreva uma quebra com `feat!: remover output legado` ou um parágrafo final iniciado por `BREAKING CHANGE: `. O GitHub usa o título e o corpo no squash. A aprovação do check Terraform certification libera o merge da revisão atualizada.
 
-Depois do merge, o Release Please reconcilia o histórico, reúne as mudanças elegíveis num PR com a versão e o changelog e publica a GitHub Release após o merge desse PR. O GitHub pode exigir autorização humana para iniciar o CI do PR criado pelo token do workflow. O repositório tem um único mantenedor e exige CI. CODEOWNERS identifica o responsável.
+Depois do merge, o Release Please reconcilia o histórico, reúne as mudanças elegíveis num PR com a versão e o changelog e publica a GitHub Release após o merge desse PR. O fine-grained PAT do mantenedor autentica a preparação do PR e o CI inicia com o evento normal. Após o squash, o job authorize verifica a árvore certificada antes da criação da tag. A release inclui certification.json desde a adoção desse gate. O repositório tem um único mantenedor e exige CI. CODEOWNERS identifica o responsável.
 
 Consulte os resultados e SHAs no [relatório de homologação](docs/validation-report.md), a [arquitetura](docs/architecture.md) e o [procedimento de operação](docs/release-management.md).
 
