@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.1.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.0.1...v7.1.0) (2026-11-26)
+
+
+### Funcionalidades
+
+* accept the OCI amd64 architecture alias ([#23](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/23)) ([e4cb30f](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/e4cb30f0a43e597266ede0d650ff7c8140ee017d))
+
 ## [7.0.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.0.0...v7.0.1) (2026-11-26)
 
 

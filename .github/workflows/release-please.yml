@@ -13,7 +13,31 @@ concurrency:
   group: release-please-main
   cancel-in-progress: false
 jobs:
+  authorize:
+    if: github.ref == 'refs/heads/main' && github.repository == 'TomasAlric/terraform-module-release-please-poc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      proposal: ${{ steps.verify.outputs.proposal }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Verify exact merged release candidate
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_CERTIFICATION_RUN: ${{ vars.EXPECTED_CERTIFICATION_RUN }}
+        run: node scripts/release/publication.cjs authorize
   release:
+    needs: authorize
     if: github.ref == 'refs/heads/main' && github.repository == 'TomasAlric/terraform-module-release-please-poc'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -28,14 +52,6 @@ jobs:
           fi
           test "$(gh api user --jq .id)" = 82914085
           echo "Authenticated writer: TomasAlric (82914085)" >> "$GITHUB_STEP_SUMMARY"
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        id: release
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          skip-github-pull-request: true
-          target-branch: main
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
@@ -43,6 +59,12 @@ jobs:
           ref: ${{ github.sha }}
       - name: Install pinned Release Please library
         run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Publish certified SHA with Release Please
+        if: needs.authorize.outputs.proposal != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          CERTIFIED_PROPOSAL: ${{ needs.authorize.outputs.proposal }}
+        run: node scripts/release/publication.cjs publish
       - name: Reconcile Release PR without rewriting history
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
@@ -52,6 +74,4 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: node scripts/release/candidate.cjs
       - if: always()
-        env:
-          TAG: ${{ steps.release.outputs.tag_name }}
-        run: echo "Reconciliação de $GITHUB_SHA · tag $TAG" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Reconciliação de $GITHUB_SHA · ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
