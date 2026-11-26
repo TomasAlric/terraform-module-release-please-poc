@@ -12,7 +12,7 @@ variable "cluster_version" {
   nullable = false
   default  = "1.31"
   validation {
-    condition     = can(regex("^[0-9]+[.][0-9]+$", var.cluster_version))
+    condition     = can(regex("^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$", var.cluster_version))
     error_message = "Use major.minor."
   }
 }
