@@ -1,0 +1,46 @@
+name: Terraform CI
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    name: Terraform certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.6.6
+          terraform_wrapper: false
+      - name: Validate squash title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(fix|feat|perf|docs|test|chore|refactor|ci)(\([^)]+\))?!?: [^[:space:]].*$'
+          [[ "$PR_TITLE" =~ $pattern ]]
+      - name: Module and release configuration
+        run: scripts/certify.sh
+      - name: Infrastructure certification extension
+        env:
+          HOLD_VERSION: ${{ vars.CERTIFICATION_HOLD_VERSION }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
+        run: |
+          if [[ "$SOURCE_BRANCH" == release-please--* ]]; then
+            test "$(jq -r '.["."]' .release-please-manifest.json)" != "$HOLD_VERSION"
+          fi
+      - if: always()
+        env:
+          RESULT: ${{ job.status }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "Terraform 1.6.6 · $RESULT · PR head $HEAD · merge $GITHUB_SHA · tree $(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_STEP_SUMMARY"
+          git rev-parse 'HEAD^{tree}'
