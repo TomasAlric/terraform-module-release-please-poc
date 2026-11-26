@@ -7,15 +7,17 @@ Snapshot de 26/11/2026 UTC. Todos os links referem-se ao repositório público p
 | H01 | PASS | Tag, release, manifest e changelog em 6.2.0. Nove runs de contrato passaram no bootstrap. |
 | H02 | PASS | O fix rejeitou hífen final no nome. O bot abriu o PR de 6.2.1, escreveu changelog e manifest e publicou após certificação e merge. |
 | H03 | PASS | Somente README mudou no PR 6. A reconciliação não publicou tag nem incrementou o candidato preexistente. Foi executado com o PATCH ainda aberto. |
-| H04 | BLOCKED | Input opcional addon_channels certificado no PR 7. O Release PR 8 propôs 6.3.0. A publicação depende de certificação. |
-| H05 | NOT EXECUTED | Acumular fix e feat e verificar mesma proposta, duas entradas e incremento MINOR. |
-| H06 | NOT EXECUTED | Alterar contrato e publicar MAJOR. O parser já produziu 7.0.0 no experimento local. |
+| H04 | PASS | Input opcional addon_channels certificado no PR 7. O bot abriu o PR 8 e publicou 6.3.0 após certificação e merge. |
+| H05 | PASS | O mesmo PR 12 passou de 6.3.1 para 6.4.0 após o feat. O changelog contém os PRs 10 e 11. Nenhuma tag intermediária foi criada. |
+| H06 | BLOCKED | O PR 14 integrou a renomeação incompatível de capacity_type para capacity_model. O PR 12 passou para 7.0.0 com seção BREAKING CHANGES. Publicação pendente de certificação no GitHub. |
 | H07 | PASS | Ao fixar arquitetura em arm64 o Terraform Test falhou. O GitHub recusou o merge. A correção restaurou o mapeamento e acrescentou cobertura ARM com capacidade sob demanda. |
 | H08 | PASS | Reconciliação de main no mesmo SHA conservou a única tag 6.2.0 e um único candidato 6.2.1 com o mesmo head. |
 | H09 | PASS | Dois dispatches a dois segundos de distância conservam tag, versão e PR únicos. Jobs executaram de 03:04:55 a 03:05:02 e de 03:05:05 a 03:05:15 UTC. |
-| H10 | PASS | As duas releases existentes neste snapshot passaram na auditoria de árvore, SHA, PR, manifest, changelog, notas e certificação. |
-| H11 | NOT EXECUTED | Uma mudança test deixou o PR 3 BEHIND. Falta comprovar nova certificação de uma mudança elegível acumulada em candidato previamente verde. |
+| H10 | PASS | As três releases existentes neste snapshot passaram na auditoria de árvore, SHA, PR, manifest, changelog, notas e certificação. |
+| H11 | BLOCKED | O bot gerou novos heads e novos runs para cada mudança elegível e o merge permaneceu bloqueado. A primeira revisão 6.3.1 atualizada passou em 12 testes locais. A sequência de dois heads certificados no CI hospedado ainda depende de autorização. |
 | H12 | PASS | A retenção experimental de 6.2.1 reprovou diretamente o gate do PR 3. Merge recusado e apenas v6.2.0 publicada naquele instante. Depois da retirada da retenção, a segunda tentativa certificou a mesma revisão e permitiu a publicação. |
+
+Resultado geral **BLOCKED** para a homologação integral. A autorização do runner do bot é a dependência externa para a MAJOR.
 
 ## Evidências
 
@@ -23,6 +25,7 @@ Snapshot de 26/11/2026 UTC. Todos os links referem-se ao repositório público p
 |---|---|---|---|---|
 | [v6.2.0](https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.2.0) | [#1](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/1) | [run](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45746401361) | 6042bf2bff2cf45cba858c4bae677709120d6298 | 9cb343f3ec8fc570368b69f5a8e2e79eee00b94e |
 | [v6.2.1](https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.2.1) | [#3](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/3) | [run](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45746966949) | e39cbc4984b2388be44a3c45a3ae3ca26b00a14b | 6feefe1c4cf04ca60af83723ee9277bf9a862554 |
+| [v6.3.0](https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.3.0) | [#8](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/8) | [run](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747308832) | eeb9208b5e8d863c5606db275b9d53483d69cd6b | 3e86828c1f15cc30c72d55a031e9a9686148777d |
 
 | Experimento | Registros |
 |---|---|
@@ -36,3 +39,18 @@ Snapshot de 26/11/2026 UTC. Todos os links referem-se ao repositório público p
 | Ruleset ativo | [rules/28132014](https://github.com/TomasAlric/terraform-module-release-please-poc/rules/28132014) |
 
 O head reprovado em H07 foi 04cdc53958d22a727c23dfb29040472361ca1af1. A revisão corrigida foi f4be5cb863769f14cd1201f7ef2c4c2b6697aaf7. O Release PR 3 abriu em a1d7f33ced6468b02aaf3c102d9175cd3c175b31 e foi certificado em 103a2d77ee0da945a02401326f5e6e620ed6e4c0 após sincronização com main. O GitHub exigiu autorização no evento de abertura gerado pelo token do bot. O evento de atualização pelo mantenedor criou novo CI no head atualizado.
+
+## Reconciliações posteriores
+
+- PATCH proposto. [PR #10](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/10) · [reconciliação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747454848) · [changelog do candidato](https://github.com/TomasAlric/terraform-module-release-please-poc/blob/457d83e92ef78783640158421ed3931639080503/CHANGELOG.md)
+- Transporte fast-forward. [PR #13](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/13) · [reconciliação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747737197) · [changelog do candidato](https://github.com/TomasAlric/terraform-module-release-please-poc/blob/3b1a350c12a7aeeedc0fd580ac56d0ada2ab03ba/CHANGELOG.md)
+- MINOR acumulada. [PR #11](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/11) · [reconciliação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747846293) · [changelog do candidato](https://github.com/TomasAlric/terraform-module-release-please-poc/blob/3f4c670e34d7d34f53e55c5d3a42fc0df0a90153/CHANGELOG.md)
+- MAJOR acumulada. [PR #14](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/14) · [reconciliação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747901767) · [changelog do candidato](https://github.com/TomasAlric/terraform-module-release-please-poc/blob/61e22d60377e0ffb2c54d087ae2bceb4fba9a815/CHANGELOG.md)
+
+O dispatch sem commits elegíveis após a publicação de 6.3.0 terminou com sucesso no SHA da tag. O log registra “No commits for path”. [H08 após publicação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747397390)
+
+O workflow apresentou a MAJOR no mesmo PR que havia acumulado fix e feat. Os três eventos de atualização exigiram execução por revisão. O GitHub deixou a certificação em action_required. [PR atual](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/12) · [CI de 6.3.1](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747774760) · [CI de 6.4.0](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747875746) · [CI de 7.0.0](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45747939746)
+
+A reutilização nativa da branch do bot produziu histórico divergente entre candidatos no início da POC. Preservamos essa evidência e protegemos a referência com um segundo ruleset. A atualização elegível seguinte foi fast-forward e levou o head anterior como ancestral. [Divergência inicial](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/103a2d77ee0da945a02401326f5e6e620ed6e4c0...483b5ae0ef0a70a2e44582faba675f5613e8da04) · [Histórico após correção](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/3b1a350c12a7aeeedc0fd580ac56d0ada2ab03ba...3f4c670e34d7d34f53e55c5d3a42fc0df0a90153)
+
+Os dez casos do script check-policy.cjs passaram com a biblioteca 17.6.0. Eles exercitam a geração de candidato em memória. As publicações hospedadas e seus SHAs constam da tabela de releases. O único recurso aplicado na homologação foi terraform_data em estado de teste local ao runner. A execução não acessou APIs ou credenciais AWS.
