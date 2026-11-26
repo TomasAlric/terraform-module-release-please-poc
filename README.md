@@ -1,6 +1,6 @@
 # Release management de um módulo Terraform
 
-Esta POC pessoal simula a configuração de um cluster com o recurso embutido `terraform_data`. A versão inicial do módulo é 6.2.0. O runner usa Terraform CLI 1.6.6, Bash e jq. O exemplo em `examples/complete` mostra os sete inputs e o objeto de saída `cluster`.
+Esta POC pessoal simula a configuração de um cluster com o recurso embutido `terraform_data`. A versão inicial do módulo é 6.2.0. O runner usa Terraform CLI 1.6.6, Bash e jq. O exemplo em `examples/complete` mostra uma configuração completa e o objeto de saída `cluster`.
 
 ## Testes locais
 
