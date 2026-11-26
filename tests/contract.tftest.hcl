@@ -113,3 +113,14 @@ run "invalid_padded_version" {
   }
   expect_failures = [var.cluster_version]
 }
+
+run "dns_label_starting_with_digit" {
+  command = plan
+  variables {
+    cluster_name = "3-zone"
+  }
+  assert {
+    condition     = output.cluster.name == "3-zone"
+    error_message = "O contrato deve preservar um nome DNS iniciado por dígito."
+  }
+}
