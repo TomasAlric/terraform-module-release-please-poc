@@ -66,3 +66,10 @@ variable "tags" {
     error_message = "Use chaves com nome e valores definidos."
   }
 }
+
+variable "addon_channels" {
+  description = "Metadados opcionais de addons."
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}
