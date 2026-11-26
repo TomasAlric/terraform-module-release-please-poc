@@ -14,7 +14,7 @@ Snapshot de 26/11/2026 UTC. Todos os links referem-se ao repositório público p
 | H08 | PASS | Reconciliação de main no mesmo SHA conservou a única tag 6.2.0 e um único candidato 6.2.1 com o mesmo head. |
 | H09 | PASS | Dois dispatches a dois segundos de distância conservam tag, versão e PR únicos. Jobs executaram de 03:04:55 a 03:05:02 e de 03:05:05 a 03:05:15 UTC. |
 | H10 | PASS | As três releases existentes neste snapshot passaram na auditoria de árvore, SHA, PR, manifest, changelog, notas e certificação. |
-| H11 | BLOCKED | O bot gerou novos heads e novos runs para cada mudança elegível e o merge permaneceu bloqueado. A primeira revisão 6.3.1 atualizada passou em 12 testes locais. A sequência de dois heads certificados no CI hospedado ainda depende de autorização. |
+| H11 | BLOCKED | O bot gerou novos heads e novos runs para cada mudança elegível e o merge permaneceu bloqueado. A primeira revisão 6.3.1 atualizada passou em 12 testes locais. O head 75f4603 foi certificado no GitHub. Após o fix #16 o head a8f6a3a exige outra autorização para executar o CI. |
 | H12 | PASS | A retenção experimental de 6.2.1 reprovou diretamente o gate do PR 3. Merge recusado e apenas v6.2.0 publicada naquele instante. Depois da retirada da retenção, a segunda tentativa certificou a mesma revisão e permitiu a publicação. |
 
 Resultado geral **BLOCKED** para a homologação integral. A autorização do runner do bot é a dependência externa para a MAJOR.
@@ -54,3 +54,12 @@ O workflow apresentou a MAJOR no mesmo PR que havia acumulado fix e feat. Os tr�
 A reutilização nativa da branch do bot produziu histórico divergente entre candidatos no início da POC. Preservamos essa evidência e protegemos a referência com um segundo ruleset. A atualização elegível seguinte foi fast-forward e levou o head anterior como ancestral. [Divergência inicial](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/103a2d77ee0da945a02401326f5e6e620ed6e4c0...483b5ae0ef0a70a2e44582faba675f5613e8da04) · [Histórico após correção](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/3b1a350c12a7aeeedc0fd580ac56d0ada2ab03ba...3f4c670e34d7d34f53e55c5d3a42fc0df0a90153)
 
 Os dez casos do script check-policy.cjs passaram com a biblioteca 17.6.0. Eles exercitam a geração de candidato em memória. As publicações hospedadas e seus SHAs constam da tabela de releases. O único recurso aplicado na homologação foi terraform_data em estado de teste local ao runner. A execução não acessou APIs ou credenciais AWS.
+
+## H11 após a primeira autorização
+
+| Revisão do PR #12 | Tree SHA | Run hospedado | Observação |
+|---|---|---|---|
+| 75f4603d28b54a0b3ad3fec416a367c07efc9014 | be9d05223a419b9f94b140f56818b594f8af8690 | [45748126424, tentativa 2](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45748126424/attempts/2) | SUCCESS, 12 testes, árvore do merge sintético 4ddb25423719001a8df6322672262fc6ee3e1db7 confirmada no log. O PR estava OPEN e CLEAN. |
+| a8f6a3a16dfd91f2d6f8d359f7c90f0083db87d6 | 05d6079a8131a4e39fd187c5cda66cd7008b7ed5 | [45751632630](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45751632630) | Na abertura da recertificação, action_required e PR BLOCKED, sem resultado do check para esse head. A árvore nesta linha foi lida do commit do candidato. |
+
+O novo teste de nome DNS iniciado por dígito produziu 12 passes e uma falha antes do fix. Depois passaram 13 testes. O squash protegido 80150dbf01c7eef29587b11a69b5c1a5485bd082 integrou a correção. O bot acrescentou o fix ao changelog do mesmo PR #12 e manteve 7.0.0 no manifest. O candidato tem como pais esse squash e o head previamente verde. O check obrigatório continua estrito e vinculado ao app GitHub Actions. [PR #16](https://github.com/TomasAlric/terraform-module-release-please-poc/pull/16) · [CI da correção](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45751557696) · [Reconciliação](https://github.com/TomasAlric/terraform-module-release-please-poc/actions/runs/45751594717) · [Impedimento](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/4#issuecomment-7182102114)
