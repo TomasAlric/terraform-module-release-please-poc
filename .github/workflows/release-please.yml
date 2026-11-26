@@ -20,11 +20,25 @@ jobs:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
+          skip-github-pull-request: true
           target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Install pinned Release Please library
+        run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Reconcile Release PR without rewriting history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: node scripts/release/candidate.cjs
       - if: always()
         env:
           TAG: ${{ steps.release.outputs.tag_name }}
-          CREATED: ${{ steps.release.outputs.prs_created }}
-        run: echo "Reconciliação de $GITHUB_SHA · tag $TAG · PR atualizado $CREATED" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Reconciliação de $GITHUB_SHA · tag $TAG" >> "$GITHUB_STEP_SUMMARY"
