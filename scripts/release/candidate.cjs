@@ -10,6 +10,7 @@ const git = (...args) => command('git', args);
 const gh = (...args) => command('gh', args);
 
 async function reconcile() {
+  if (!process.env.GH_TOKEN) throw Error('Release credential required');
   const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
   const github = await GitHub.create({ owner, repo, token: process.env.GH_TOKEN });
   const manifest = await Manifest.fromManifest(github, 'main');

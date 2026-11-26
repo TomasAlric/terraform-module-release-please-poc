@@ -124,3 +124,25 @@ run "dns_label_starting_with_digit" {
     error_message = "O contrato deve preservar um nome DNS iniciado por dígito."
   }
 }
+
+run "build_metadata" {
+  command = plan
+  variables {
+    bottlerocket_version = "1.24.0+build.3"
+  }
+  assert {
+    condition     = output.cluster.bottlerocket_version == "1.24.0+build.3"
+    error_message = "Preserve the exact Bottlerocket version."
+  }
+}
+
+run "prerelease" {
+  command = plan
+  variables {
+    bottlerocket_version = "1.24.0-rc.1+build.3"
+  }
+  assert {
+    condition     = output.cluster.bottlerocket_version == "1.24.0-rc.1+build.3"
+    error_message = "Preserve the exact Bottlerocket version."
+  }
+}

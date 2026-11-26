@@ -22,7 +22,7 @@ variable "bottlerocket_version" {
   nullable = false
   default  = "1.24.0"
   validation {
-    condition     = can(regex("^[0-9]+[.][0-9]+[.][0-9]+$", var.bottlerocket_version))
+    condition     = can(regex("^[0-9]+[.][0-9]+[.][0-9]+(-(0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)([.](0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?([+][0-9A-Za-z-]+([.][0-9A-Za-z-]+)*)?$", var.bottlerocket_version))
     error_message = "Use major.minor.patch."
   }
 }
