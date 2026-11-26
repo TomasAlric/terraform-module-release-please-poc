@@ -19,10 +19,11 @@ run "custom_contract" {
     architecture         = "arm64"
     capacity_type        = "SPOT"
     addons               = { dns = "v1" }
+    addon_channels       = { dns = "lab" }
     tags                 = { env = "poc" }
   }
   assert {
-    condition     = output.cluster.name == "custom" && output.cluster.version == "1.32" && output.cluster.bottlerocket_version == "1.25.0" && output.cluster.architecture == "arm64" && output.cluster.capacity_type == "SPOT" && output.cluster.addons == tomap({ dns = "v1" }) && output.cluster.tags == tomap({ env = "poc" })
+    condition     = output.cluster.addon_channels["dns"] == "lab" && output.cluster.name == "custom" && output.cluster.version == "1.32" && output.cluster.bottlerocket_version == "1.25.0" && output.cluster.architecture == "arm64" && output.cluster.capacity_type == "SPOT" && output.cluster.addons == tomap({ dns = "v1" }) && output.cluster.tags == tomap({ env = "poc" })
     error_message = "A configuração aplicada diverge dos inputs."
   }
 }
@@ -78,7 +79,8 @@ run "invalid_addons" {
 run "invalid_tags" {
   command = plan
   variables {
-    tags = { "" = "lab" }
+    addon_channels = { dns = "lab" }
+    tags           = { "" = "lab" }
   }
   expect_failures = [var.tags]
 }

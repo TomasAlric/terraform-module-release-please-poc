@@ -6,6 +6,7 @@ locals {
     architecture         = var.architecture
     capacity_type        = var.capacity_type
     addons               = var.addons
+    addon_channels       = var.addon_channels
     tags                 = var.tags
   }
 }
