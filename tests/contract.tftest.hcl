@@ -103,3 +103,11 @@ run "arm_on_demand" {
     error_message = "ARM deve funcionar com capacidade sob demanda."
   }
 }
+
+run "invalid_padded_version" {
+  command = plan
+  variables {
+    cluster_version = "01.31"
+  }
+  expect_failures = [var.cluster_version]
+}
