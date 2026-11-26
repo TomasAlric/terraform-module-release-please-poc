@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.2.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.2.0...v6.2.1) (2026-11-26)
+
+
+### Correções
+
+* reject a trailing hyphen in DNS cluster names ([#2](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/2)) ([deea7ea](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/deea7eaadc311cb353d2ccc9c81d2dbebc6aa63c))
+
 ## 6.2.0
 
 Baseline do módulo fictício. O contrato descreve versões, capacidade, arquitetura, addons e tags de um cluster.
