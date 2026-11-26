@@ -17,7 +17,7 @@ run "custom_contract" {
     cluster_version      = "1.32"
     bottlerocket_version = "1.25.0"
     architecture         = "arm64"
-    capacity_type        = "SPOT"
+    capacity_model       = "SPOT"
     addons               = { dns = "v1" }
     addon_channels       = { dns = "lab" }
     addon_owners         = { dns = "lab" }
@@ -64,9 +64,9 @@ run "invalid_architecture" {
 run "invalid_capacity_type" {
   command = plan
   variables {
-    capacity_type = "AUTO"
+    capacity_model = "AUTO"
   }
-  expect_failures = [var.capacity_type]
+  expect_failures = [var.capacity_model]
 }
 
 run "invalid_addons" {
