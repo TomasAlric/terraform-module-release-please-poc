@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.3.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.2.1...v6.3.0) (2026-11-26)
+
+
+### Funcionalidades
+
+* expose optional addon channels ([#7](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/7)) ([9bf8048](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/9bf8048bc340682cbb5edcd20ee12fe3de58ea7f))
+
 ## [6.2.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.2.0...v6.2.1) (2026-11-26)
 
 
