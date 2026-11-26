@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.4.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.3.0...v6.4.0) (2026-11-26)
+
+
+### Correções
+
+* reject ambiguous zero-padded cluster versions ([#10](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/10)) ([3818cfa](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/3818cfa2a957cc85d26749ffc22ff55fb20a2f89))
+
+
+### Funcionalidades
+
+* add optional addon ownership metadata ([#11](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/11)) ([91a36e3](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/91a36e3cb1e6f7c4a8c623abd10fdcbe39b62d17))
+
 ## [6.3.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v6.2.1...v6.3.0) (2026-11-26)
 
 
