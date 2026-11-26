@@ -146,3 +146,14 @@ run "prerelease" {
     error_message = "Preserve the exact Bottlerocket version."
   }
 }
+
+run "oci_architecture_alias" {
+  command = plan
+  variables {
+    architecture = "amd64"
+  }
+  assert {
+    condition     = output.cluster.architecture == "x86_64"
+    error_message = "OCI amd64 must resolve to the canonical x86_64 contract."
+  }
+}
