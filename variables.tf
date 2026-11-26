@@ -73,3 +73,10 @@ variable "addon_channels" {
   default     = {}
   nullable    = false
 }
+
+variable "addon_owners" {
+  description = "Metadados opcionais de addons."
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}

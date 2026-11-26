@@ -7,6 +7,7 @@ locals {
     capacity_type        = var.capacity_model
     addons               = var.addons
     addon_channels       = var.addon_channels
+    addon_owners         = var.addon_owners
     tags                 = var.tags
   }
 }
