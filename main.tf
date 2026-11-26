@@ -3,7 +3,7 @@ locals {
     name                 = var.cluster_name
     version              = var.cluster_version
     bottlerocket_version = var.bottlerocket_version
-    architecture         = "arm64"
+    architecture         = var.architecture
     capacity_type        = var.capacity_type
     addons               = var.addons
     tags                 = var.tags
