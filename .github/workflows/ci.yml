@@ -42,5 +42,5 @@ jobs:
           RESULT: ${{ job.status }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          echo "Terraform 1.6.6 · $RESULT · PR head $HEAD · merge $GITHUB_SHA · tree $(git rev-parse HEAD^{tree})" >> "$GITHUB_STEP_SUMMARY"
-          git rev-parse HEAD^{tree}
+          echo "Terraform 1.6.6 · $RESULT · PR head $HEAD · merge $GITHUB_SHA · tree $(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_STEP_SUMMARY"
+          git rev-parse 'HEAD^{tree}'
