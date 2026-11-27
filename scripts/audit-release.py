@@ -46,7 +46,29 @@ if tag != "v6.2.0":
 tree = commit["commit"]["tree"]["sha"]
 log = github("run", "view", run_id, "--repo", repo, "--log")
 assert re.search(r"\t[0-9ZT:.-]+ " + tree + r"\s*$", log, re.MULTILINE)
-print(json.dumps({"tag": tag, "commit": commit["sha"], "tree": tree, "certified_head": run["head_sha"],
-                  "pr_author": pr_author, "publisher": publisher, "ci_actor": run["actor"]["login"],
-                  "candidate_commit_author": api(f"commits/{run['head_sha']}")["commit"]["author"]["name"],
-                  "pr": pr["html_url"], "ci": run["html_url"], "release": release["html_url"]}))
+result = {
+    "tag": tag,
+    "commit": commit["sha"],
+    "tree": tree,
+    "certified_head": run["head_sha"],
+    "pr_author": pr_author,
+    "publisher": publisher,
+    "ci_actor": run["actor"]["login"],
+    "candidate_commit_author": api(f"commits/{run['head_sha']}")["commit"]["author"]["name"],
+    "pr": pr["html_url"],
+    "ci": run["html_url"],
+    "release": release["html_url"],
+}
+if any(a["name"] == "certification.json" for a in release.get("assets", [])):
+    cert_raw = github("release", "download", tag, "--repo", repo, "--pattern", "certification.json", "--output", "-")
+    cert_doc = json.loads(cert_raw)
+    assert cert_doc["certified_tree"] == tree and cert_doc["merge_commit"] == commit["sha"]
+    if cert_doc.get("policy_version", 1) >= 2:
+        c = cert_doc["certification"]
+        assert c["result"] == "PASS" and c["fresh_installation"] == "PASS" and c["consumer_upgrade"] == "PASS"
+        assert c["terraform_contracts"] == "PASS" and c["upgrade_impact_policy"] == "PASS"
+        assert c["post_upgrade_idempotency"] == "PASS" and c["cleanup"] == "PASS"
+        result["release_candidate"] = cert_doc["release_candidate"]["reference"]
+        result["upgrade_impact"] = cert_doc["upgrade_impact"]
+        result["policy_version"] = cert_doc["policy_version"]
+print(json.dumps(result))

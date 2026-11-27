@@ -8,3 +8,12 @@ terraform -chdir=examples/complete init -backend=false -input=false
 terraform -chdir=examples/complete validate
 jq -e 'keys == ["packages"] and (.packages | keys == ["."]) and (.packages["."] | ."release-type" == "terraform-module" and ."include-component-in-tag" == false and ."include-v-in-tag" == true and ([."changelog-sections"[].type] | sort == ["feat","fix","perf"]))' release-please-config.json
 jq -e 'keys == ["."] and (.["."] | test("^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$"))' .release-please-manifest.json
+python3 -c '
+import subprocess, sys
+sys.path.insert(0, "scripts/release")
+import verify
+for path, expected in verify.CI_POLICY.items():
+    actual = subprocess.check_output(["git", "hash-object", path], text=True).strip()
+    if actual != expected:
+        raise SystemExit(f"CI_POLICY hash mismatch for {path}: expected {expected}, actual {actual}")
+'
