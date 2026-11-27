@@ -157,3 +157,16 @@ run "oci_architecture_alias" {
     error_message = "OCI amd64 must resolve to the canonical x86_64 contract."
   }
 }
+
+run "normalized_addon_metadata" {
+  command = plan
+  variables {
+    addons         = { " dns " = " v1 " }
+    addon_channels = { " dns " = " stable " }
+    addon_owners   = { " dns " = " platform " }
+  }
+  assert {
+    condition     = output.cluster.addons["dns"] == "v1" && output.cluster.addon_channels["dns"] == "stable" && output.cluster.addon_owners["dns"] == "platform"
+    error_message = "Addon metadata keys and values must be trimmed."
+  }
+}
