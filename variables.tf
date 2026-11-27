@@ -80,3 +80,14 @@ variable "addon_owners" {
   default     = {}
   nullable    = false
 }
+
+variable "maintenance_window" {
+  description = "Janela opcional de manutenção do cluster."
+  type        = string
+  default     = "sun:03:00-sun:04:00"
+  nullable    = false
+  validation {
+    condition     = can(regex("^(mon|tue|wed|thu|fri|sat|sun):[0-2][0-9]:[0-5][0-9]-(mon|tue|wed|thu|fri|sat|sun):[0-2][0-9]:[0-5][0-9]$", var.maintenance_window))
+    error_message = "Use o formato ddd:hh:mm-ddd:hh:mm."
+  }
+}

@@ -8,6 +8,7 @@ locals {
     addons               = var.addons
     addon_channels       = var.addon_channels
     addon_owners         = var.addon_owners
+    maintenance_window   = var.maintenance_window
     tags                 = var.tags
   }
 }
