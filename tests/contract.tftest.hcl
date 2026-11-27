@@ -170,3 +170,19 @@ run "normalized_addon_metadata" {
     error_message = "Addon metadata keys and values must be trimmed."
   }
 }
+
+run "default_maintenance_window" {
+  command = plan
+  assert {
+    condition     = output.cluster.maintenance_window == "sun:03:00-sun:04:00"
+    error_message = "Default maintenance window must be preserved."
+  }
+}
+
+run "invalid_maintenance_window" {
+  command = plan
+  variables {
+    maintenance_window = "anytime"
+  }
+  expect_failures = [var.maintenance_window]
+}
