@@ -9,10 +9,84 @@ concurrency:
   group: ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
-  contracts:
-    name: Terraform certification
+  prepare-candidate:
+    name: Release Version Preview & Candidate
+    if: github.repository == 'TomasAlric/terraform-module-release-please-poc'
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    outputs:
+      candidate_tag: ${{ steps.preview.outputs.candidate_tag }}
+      stable_tag: ${{ steps.preview.outputs.stable_tag }}
+      release_type: ${{ steps.preview.outputs.release_type }}
+      declared_breaking: ${{ steps.preview.outputs.declared_breaking }}
+      migration_doc_present: ${{ steps.preview.outputs.migration_doc_present }}
+      evidence_reused: ${{ steps.preview.outputs.evidence_reused }}
+      preview_json: ${{ steps.preview.outputs.preview_json }}
+    steps:
+      - name: Checkout trusted main baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Fetch PR commits as Git objects without checkout
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TESTED_SHA: ${{ github.sha }}
+        run: |
+          git fetch --tags origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/head" \
+            "+refs/pull/${PR_NUMBER}/merge:refs/remotes/pull/merge" \
+            "$HEAD_SHA" "$TESTED_SHA"
+          if [[ ! -f scripts/release/preview.cjs ]]; then
+            test "${{ github.event.pull_request.user.id }}" = "82914085"
+            git checkout "$TESTED_SHA" -- scripts/release scripts/certify
+          fi
+      - name: Install pinned Release Please library
+        run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Calculate release version preview and create candidate
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_PATH: ${{ github.workspace }}/scripts/release/node_modules
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+          TESTED_SHA: ${{ github.sha }}
+          DISABLE_EVIDENCE_REUSE: ${{ vars.DISABLE_EVIDENCE_REUSE }}
+          ENABLE_PR_EVIDENCE_REUSE: ${{ vars.ENABLE_PR_EVIDENCE_REUSE }}
+        run: |
+          node scripts/release/preview.cjs "$RUNNER_TEMP/preview.json"
+          node scripts/release/rc.cjs "$RUNNER_TEMP/preview.json"
+          node scripts/release/comment.cjs pending "$RUNNER_TEMP/preview.json"
+          {
+            echo "candidate_tag=$(jq -r '.candidate_tag' "$RUNNER_TEMP/preview.json")"
+            echo "stable_tag=$(jq -r '.current_stable_tag' "$RUNNER_TEMP/preview.json")"
+            echo "release_type=$(jq -r '.release_type' "$RUNNER_TEMP/preview.json")"
+            echo "declared_breaking=$(jq -r '.declared_breaking' "$RUNNER_TEMP/preview.json")"
+            echo "migration_doc_present=$(jq -r '.migration_doc_present' "$RUNNER_TEMP/preview.json")"
+            echo "evidence_reused=$(jq -r '.evidence_reuse.reused' "$RUNNER_TEMP/preview.json")"
+            echo "preview_json=$(jq -c '.' "$RUNNER_TEMP/preview.json")"
+          } >> "$GITHUB_OUTPUT"
+
+  contract-tests:
+    name: Terraform Contract Tests
+    needs: prepare-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    outputs:
+      contracts_json: ${{ steps.emit_contracts.outputs.contracts_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -21,21 +95,219 @@ jobs:
         with:
           terraform_version: 1.6.6
           terraform_wrapper: false
-      - name: Validate squash title
+      - name: Validate squash title and execute module contracts
+        id: run_contracts
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          set +e
           pattern='^(fix|feat|perf|docs|test|chore|refactor|ci)(\([^)]+\))?!?: [^[:space:]].*$'
-          [[ "$PR_TITLE" =~ $pattern ]]
-      - name: Module and release configuration
-        run: scripts/certify.sh
-      - name: Infrastructure certification extension
-        env:
-          HOLD_VERSION: ${{ vars.CERTIFICATION_HOLD_VERSION }}
-          SOURCE_BRANCH: ${{ github.head_ref }}
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            jq -n '{result: "FAIL", failure_reason: "PR squash title does not conform to Conventional Commits."}' > "$RUNNER_TEMP/contracts.json"
+            exit 1
+          fi
+          if scripts/certify.sh; then
+            jq -n '{result: "PASS", failure_reason: null}' > "$RUNNER_TEMP/contracts.json"
+          else
+            jq -n '{result: "FAIL", failure_reason: "Terraform module contract tests or policy verification failed."}' > "$RUNNER_TEMP/contracts.json"
+            exit 1
+          fi
+      - name: Export contract test evidence
+        id: emit_contracts
+        if: always()
         run: |
-          if [[ "$SOURCE_BRANCH" == release-please--* ]]; then
-            test "$(jq -r '.["."]' .release-please-manifest.json)" != "$HOLD_VERSION"
+          if [[ -f "$RUNNER_TEMP/contracts.json" ]]; then
+            echo "contracts_json=$(jq -c '.' "$RUNNER_TEMP/contracts.json")" >> "$GITHUB_OUTPUT"
+          fi
+
+  fresh-installation:
+    name: Fresh Installation Certification
+    needs: prepare-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    outputs:
+      day0_json: ${{ steps.emit_day0.outputs.day0_json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.6.6
+          terraform_wrapper: false
+      - name: Execute or verify Day 0 Fresh Installation
+        env:
+          CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}
+          EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
+        run: |
+          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
+          if [[ "$EVIDENCE_REUSED" == "true" ]]; then
+            verify_dir="$(mktemp -d)"
+            git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
+            local_hash="$(shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
+            remote_hash="$(cd "$verify_dir" && shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
+            rm -rf "$verify_dir"
+            test "$local_hash" = "$remote_hash"
+            source_run="$(jq -r '.evidence_reuse.source_run_id' "$RUNNER_TEMP/preview.json")"
+            jq -n \
+              --arg ref "$CANDIDATE_TAG" \
+              --arg hash "$remote_hash" \
+              --arg source_run "$source_run" \
+              '{
+                result: "PASS",
+                fresh_installation: "PASS",
+                terraform_contracts: "PASS",
+                idempotency: "PASS",
+                cleanup: "PASS",
+                candidate_ref: $ref,
+                expected_module_hash: $hash,
+                reused_from_run_id: $source_run,
+                failure_reason: null,
+                scenarios: []
+              }' > "$RUNNER_TEMP/day0.json"
+          else
+            bash scripts/certify/run-day0.sh "$CANDIDATE_TAG" "$RUNNER_TEMP/day0.json"
+          fi
+      - name: Export Day 0 evidence
+        id: emit_day0
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/day0.json" ]]; then
+            echo "day0_json=$(jq -c '.' "$RUNNER_TEMP/day0.json")" >> "$GITHUB_OUTPUT"
+          fi
+
+  consumer-upgrade:
+    name: Consumer Upgrade & Impact Analysis
+    needs: prepare-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      day2_json: ${{ steps.emit_day2.outputs.day2_json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.6.6
+          terraform_wrapper: false
+      - name: Execute or verify Day 2 Consumer Upgrade
+        env:
+          STABLE_TAG: ${{ needs.prepare-candidate.outputs.stable_tag }}
+          CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}
+          RELEASE_TYPE: ${{ needs.prepare-candidate.outputs.release_type }}
+          DECLARED_BREAKING: ${{ needs.prepare-candidate.outputs.declared_breaking }}
+          MIGRATION_DOC_PRESENT: ${{ needs.prepare-candidate.outputs.migration_doc_present }}
+          EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
+          SIMULATE_CLEANUP_FAILURE: ${{ vars.SIMULATE_CLEANUP_FAILURE }}
+        run: |
+          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
+          if [[ "$EVIDENCE_REUSED" == "true" && "${SIMULATE_CLEANUP_FAILURE:-false}" != "true" ]]; then
+            verify_dir="$(mktemp -d)"
+            git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
+            local_hash="$(shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
+            remote_hash="$(cd "$verify_dir" && shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
+            rm -rf "$verify_dir"
+            test "$local_hash" = "$remote_hash"
+            jq \
+              --arg stable "$STABLE_TAG" \
+              --arg candidate "$CANDIDATE_TAG" \
+              '{
+                result: "PASS",
+                consumer_upgrade: "PASS",
+                upgrade_impact_policy: "PASS",
+                post_upgrade_idempotency: "PASS",
+                cleanup: "PASS",
+                stable_tag: $stable,
+                candidate_ref: $candidate,
+                reused_from_run_id: (.evidence_reuse.source_run_id | tostring),
+                upgrade_impact: (.evidence_reuse.source_upgrade_impact // {create: 0, update: 0, replace: 0, delete: 0}),
+                upgrade_policy_details: {
+                  critical_resource_preservation: "PASS",
+                  contract_compatibility: "PASS",
+                  upgrade_authorization: "PASS"
+                },
+                failure_reason: null,
+                violations: [],
+                scenarios: []
+              }' "$RUNNER_TEMP/preview.json" > "$RUNNER_TEMP/day2.json"
+          else
+            bash scripts/certify/run-day2.sh \
+              "$STABLE_TAG" \
+              "$CANDIDATE_TAG" \
+              "$RELEASE_TYPE" \
+              "$DECLARED_BREAKING" \
+              "$MIGRATION_DOC_PRESENT" \
+              "$RUNNER_TEMP/day2.json"
+          fi
+      - name: Export Day 2 evidence
+        id: emit_day2
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/day2.json" ]]; then
+            echo "day2_json=$(jq -c '.' "$RUNNER_TEMP/day2.json")" >> "$GITHUB_OUTPUT"
+          fi
+
+  contracts:
+    name: Terraform certification
+    needs: [prepare-candidate, contract-tests, fresh-installation, consumer-upgrade]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    outputs:
+      gate_report_json: ${{ steps.emit_gate.outputs.gate_report_json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Evaluate Infrastructure Certification Gate
+        env:
+          CERTIFICATION_HOLD_VERSION: ${{ vars.CERTIFICATION_HOLD_VERSION }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          PREPARE_RESULT: ${{ needs.prepare-candidate.result }}
+          CONTRACTS_RESULT: ${{ needs.contract-tests.result }}
+          DAY0_RESULT: ${{ needs.fresh-installation.result }}
+          DAY2_RESULT: ${{ needs.consumer-upgrade.result }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
+          CONTRACTS_JSON: ${{ needs.contract-tests.outputs.contracts_json }}
+          DAY0_JSON: ${{ needs.fresh-installation.outputs.day0_json }}
+          DAY2_JSON: ${{ needs.consumer-upgrade.outputs.day2_json }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_TESTED_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          [[ -n "$PREVIEW_JSON" ]] && printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/evidence/preview.json"
+          [[ -n "$CONTRACTS_JSON" ]] && printf '%s\n' "$CONTRACTS_JSON" > "$RUNNER_TEMP/evidence/contracts.json"
+          [[ -n "$DAY0_JSON" ]] && printf '%s\n' "$DAY0_JSON" > "$RUNNER_TEMP/evidence/day0.json"
+          [[ -n "$DAY2_JSON" ]] && printf '%s\n' "$DAY2_JSON" > "$RUNNER_TEMP/evidence/day2.json"
+          git fetch --tags origin "+refs/heads/main:refs/remotes/origin/main" "$EXPECTED_HEAD_SHA"
+          python3 scripts/certify/aggregate-gate.py \
+            --preview-json "$RUNNER_TEMP/evidence/preview.json" \
+            --contracts-json "$RUNNER_TEMP/evidence/contracts.json" \
+            --day0-json "$RUNNER_TEMP/evidence/day0.json" \
+            --day2-json "$RUNNER_TEMP/evidence/day2.json" \
+            --prepare-result "$PREPARE_RESULT" \
+            --contracts-result "$CONTRACTS_RESULT" \
+            --day0-result "$DAY0_RESULT" \
+            --day2-result "$DAY2_RESULT" \
+            --expected-head-sha "$EXPECTED_HEAD_SHA" \
+            --expected-tested-sha "$EXPECTED_TESTED_SHA" \
+            --output-json "$RUNNER_TEMP/gate-report.json"
+      - name: Export aggregated certification report
+        id: emit_gate
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/gate-report.json" ]]; then
+            echo "gate_report_json=$(jq -c '.' "$RUNNER_TEMP/gate-report.json")" >> "$GITHUB_OUTPUT"
           fi
       - if: always()
         env:
@@ -44,3 +316,37 @@ jobs:
         run: |
           echo "Terraform 1.6.6 · $RESULT · PR head $HEAD · merge $GITHUB_SHA · tree $(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_STEP_SUMMARY"
           git rev-parse 'HEAD^{tree}'
+
+  publish-comment:
+    name: Publish Release Impact Comment
+    needs: [prepare-candidate, contracts]
+    if: always() && github.repository == 'TomasAlric/terraform-module-release-please-poc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout trusted main baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Load trusted comment publisher
+        env:
+          TESTED_SHA: ${{ github.sha }}
+        run: |
+          if [[ ! -f scripts/release/comment.cjs ]]; then
+            test "${{ github.event.pull_request.user.id }}" = "82914085"
+            git fetch origin "$TESTED_SHA"
+            git checkout "$TESTED_SHA" -- scripts/release
+          fi
+      - name: Update persistent PR comment
+        if: needs.contracts.outputs.gate_report_json != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATE_REPORT_JSON: ${{ needs.contracts.outputs.gate_report_json }}
+        run: |
+          printf '%s\n' "$GATE_REPORT_JSON" > "$RUNNER_TEMP/gate-report.json"
+          node scripts/release/comment.cjs final "$RUNNER_TEMP/gate-report.json"

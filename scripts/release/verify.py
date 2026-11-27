@@ -8,9 +8,29 @@ import subprocess
 REPO = "TomasAlric/terraform-module-release-please-poc"
 BRANCH = "release-please--branches--main"
 CI_POLICY = {
-    ".github/workflows/ci.yml": "eb8727117b6c6c57ccad6edaa7c795c3e518e81e",
-    "scripts/certify.sh": "ce110163a3aa0dee9fe0261bf4ae7fdf54e1b658",
+    ".github/workflows/ci.yml": "563866a60b6d3bd74638bf2c9929395bcaabda52",
+    "scripts/certify.sh": "062e851fab50d0e46c7c639522affd663a078c31",
+    "scripts/certify/analyze-plan.py": "e28894b8fbead601723aac633821755838556dc1",
+    "scripts/certify/run-day0.sh": "28772db629b832aef5964c1191611aab66fb0e03",
+    "scripts/certify/run-day2.sh": "8c8340acaeb58043a93e027b40c9bf1d286d2987",
+    "scripts/certify/aggregate-gate.py": "08cb3c569b28557672e6cd4b8be7580e6b644c0c",
 }
+REQUIRED_JOBS = {
+    "Release Version Preview & Candidate",
+    "Terraform Contract Tests",
+    "Fresh Installation Certification",
+    "Consumer Upgrade & Impact Analysis",
+    "Terraform certification",
+}
+REQUIRED_CERT_KEYS = (
+    "result",
+    "fresh_installation",
+    "consumer_upgrade",
+    "terraform_contracts",
+    "upgrade_impact_policy",
+    "post_upgrade_idempotency",
+    "cleanup",
+)
 
 
 def command(*args):
@@ -55,16 +75,22 @@ def verify(merge, tag, number):
             and run["path"] == ".github/workflows/ci.yml" and run["head_branch"] == BRANCH
             and run["head_repository"]["full_name"] == REPO, "CI identity or result mismatch")
     jobs = api(f"actions/runs/{run_id}/attempts/{attempt}/jobs")["jobs"]
+    by_name = {j["name"]: j for j in jobs}
+    for req_name in REQUIRED_JOBS:
+        require(req_name in by_name, f"missing mandatory certification job: {req_name}")
+        j = by_name[req_name]
+        require(j["conclusion"] == "success" and j["head_sha"] == head
+                and j["completed_at"] <= pr["merged_at"], f"job '{req_name}' did not certify before merge")
     matches = [j for j in jobs if j["name"] == "Terraform certification"]
     require(len(matches) == 1, "missing or ambiguous certification job")
     job = matches[0]
-    require(job["conclusion"] == "success" and job["head_sha"] == head
-            and job["completed_at"] <= pr["merged_at"], "current attempt did not certify before merge")
     log = command("gh", "run", "view", str(run_id), "--repo", REPO, "--attempt", str(attempt), "--log")
+
     def logged_sha(step):
-        matches = re.findall(r"^Terraform certification\t" + step + r"\t[0-9T:Z.-]+ ([a-f0-9]{40})$", log, re.M)
-        require(len(matches) == 1, "missing or ambiguous SHA in certification log")
-        return matches[0]
+        found = re.findall(r"^Terraform certification\t" + step + r"\t[0-9T:Z.-]+ ([a-f0-9]{40})$", log, re.M)
+        require(len(found) == 1, "missing or ambiguous SHA in certification log")
+        return found[0]
+
     synthetic = logged_sha(r"Run actions/checkout@[a-f0-9]{40}")
     tree = logged_sha(r'Run echo "Terraform 1\.6\.6[^\t]*')
     tested = api(f"git/commits/{synthetic}")
@@ -72,10 +98,60 @@ def verify(merge, tag, number):
     require([p["sha"] for p in tested["parents"]] == [base, head], "different tested base or head")
     require(tested["tree"]["sha"] == tree == command("git", "rev-parse", merge + "^{tree}"),
             "published content differs from tested tree")
-    return dict(repository=REPO, version=tag[1:], pull_request=number, candidate_head=head,
-                certified_tree=tree, merge_commit=merge, tested_merge=synthetic, base=base,
-                run_id=run_id, attempt=attempt, job_id=job["id"], result="success",
-                policy_version=1, certified_at=job["completed_at"])
+
+    ev_matches = re.findall(r"CERTIFICATION_EVIDENCE_JSON=(\{[^\r\n]+\})", log)
+    require(len(ev_matches) == 1, "missing or ambiguous CERTIFICATION_EVIDENCE_JSON in log")
+    evidence = json.loads(ev_matches[0])
+    require(evidence.get("repository") == REPO and int(evidence.get("pr_number", 0)) == number,
+            "evidence repository or pull request mismatch")
+    require(evidence.get("version") == tag[1:], "evidence predicted version does not match release tag")
+    rc = evidence.get("release_candidate", {})
+    require(rc.get("reference") and rc.get("tree_sha") == tree and rc.get("head_sha") == head,
+            "evidence release candidate coordinates mismatch")
+    cert = evidence.get("certification", {})
+    for k in REQUIRED_CERT_KEYS:
+        require(cert.get(k) == "PASS", f"certification check '{k}' did not PASS")
+
+    rc_tag_ref = f"refs/tags/{rc['reference']}"
+    remote_rc = command("git", "ls-remote", "origin", rc_tag_ref)
+    require(bool(remote_rc), f"release candidate tag {rc['reference']} not found on origin")
+
+    return dict(
+        repository=REPO,
+        version=tag[1:],
+        previous_stable_version=evidence.get("previous_stable_version"),
+        pull_request=number,
+        candidate_head=head,
+        certified_tree=tree,
+        merge_commit=merge,
+        tested_merge=synthetic,
+        base=base,
+        run_id=run_id,
+        attempt=attempt,
+        job_id=job["id"],
+        result="success",
+        policy_version=2,
+        certified_at=job["completed_at"],
+        release_candidate=dict(
+            reference=rc["reference"],
+            commit_sha=rc["commit_sha"],
+            tree_sha=tree,
+            head_sha=head,
+            base_sha=base,
+            tested_sha=synthetic,
+        ),
+        certification=cert,
+        upgrade_impact=evidence.get("upgrade_impact", {"create": 0, "update": 0, "replace": 0, "delete": 0}),
+        equivalence_fingerprint=evidence.get("equivalence_fingerprint"),
+        evidence_reuse=evidence.get("evidence_reuse"),
+        publication=dict(
+            release_pr=number,
+            published_sha=merge,
+            certified_tree=tree,
+            workflow_run_id=str(run_id),
+            policy_version="2.0",
+        ),
+    )
 
 
 if __name__ == "__main__":
