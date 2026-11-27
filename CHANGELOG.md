@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.2.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.1.1...v7.2.0) (2026-11-27)
+
+
+### Funcionalidades
+
+* add optional maintenance_window cluster metadata ([#27](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/27)) ([c2759e9](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/c2759e960b728d04886ab5ae899ed6fb357e67a6))
+
 ## [7.1.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.1.0...v7.1.1) (2026-11-27)
 
 
