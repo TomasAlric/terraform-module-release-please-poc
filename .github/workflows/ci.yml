@@ -25,6 +25,7 @@ jobs:
       declared_breaking: ${{ steps.preview.outputs.declared_breaking }}
       migration_doc_present: ${{ steps.preview.outputs.migration_doc_present }}
       evidence_reused: ${{ steps.preview.outputs.evidence_reused }}
+      preview_json: ${{ steps.preview.outputs.preview_json }}
     steps:
       - name: Checkout trusted main baseline
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,13 +75,8 @@ jobs:
             echo "declared_breaking=$(jq -r '.declared_breaking' "$RUNNER_TEMP/preview.json")"
             echo "migration_doc_present=$(jq -r '.migration_doc_present' "$RUNNER_TEMP/preview.json")"
             echo "evidence_reused=$(jq -r '.evidence_reuse.reused' "$RUNNER_TEMP/preview.json")"
+            echo "preview_json=$(jq -c '.' "$RUNNER_TEMP/preview.json")"
           } >> "$GITHUB_OUTPUT"
-      - name: Upload preview metadata artifact
-        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v7.0.0
-        with:
-          name: certification-preview
-          path: ${{ runner.temp }}/preview.json
-          if-no-files-found: error
 
   contract-tests:
     name: Terraform Contract Tests
@@ -89,6 +85,8 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: read
+    outputs:
+      contracts_json: ${{ steps.emit_contracts.outputs.contracts_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -114,13 +112,13 @@ jobs:
             jq -n '{result: "FAIL", failure_reason: "Terraform module contract tests or policy verification failed."}' > "$RUNNER_TEMP/contracts.json"
             exit 1
           fi
-      - name: Upload contract test evidence
+      - name: Export contract test evidence
+        id: emit_contracts
         if: always()
-        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v7.0.0
-        with:
-          name: certification-contracts
-          path: ${{ runner.temp }}/contracts.json
-          if-no-files-found: warn
+        run: |
+          if [[ -f "$RUNNER_TEMP/contracts.json" ]]; then
+            echo "contracts_json=$(jq -c '.' "$RUNNER_TEMP/contracts.json")" >> "$GITHUB_OUTPUT"
+          fi
 
   fresh-installation:
     name: Fresh Installation Certification
@@ -129,6 +127,8 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: read
+    outputs:
+      day0_json: ${{ steps.emit_day0.outputs.day0_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -137,16 +137,13 @@ jobs:
         with:
           terraform_version: 1.6.6
           terraform_wrapper: false
-      - name: Download preview metadata
-        uses: actions/download-artifact@c8f1b937e962efbe62cc8278cbb3fd2ce3d7fc27 # v8.0.0
-        with:
-          name: certification-preview
-          path: ${{ runner.temp }}
       - name: Execute or verify Day 0 Fresh Installation
         env:
           CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}
           EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
         run: |
+          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
           if [[ "$EVIDENCE_REUSED" == "true" ]]; then
             verify_dir="$(mktemp -d)"
             git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
@@ -174,13 +171,13 @@ jobs:
           else
             bash scripts/certify/run-day0.sh "$CANDIDATE_TAG" "$RUNNER_TEMP/day0.json"
           fi
-      - name: Upload Day 0 evidence
+      - name: Export Day 0 evidence
+        id: emit_day0
         if: always()
-        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v7.0.0
-        with:
-          name: certification-day0
-          path: ${{ runner.temp }}/day0.json
-          if-no-files-found: warn
+        run: |
+          if [[ -f "$RUNNER_TEMP/day0.json" ]]; then
+            echo "day0_json=$(jq -c '.' "$RUNNER_TEMP/day0.json")" >> "$GITHUB_OUTPUT"
+          fi
 
   consumer-upgrade:
     name: Consumer Upgrade & Impact Analysis
@@ -189,6 +186,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      day2_json: ${{ steps.emit_day2.outputs.day2_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -197,11 +196,6 @@ jobs:
         with:
           terraform_version: 1.6.6
           terraform_wrapper: false
-      - name: Download preview metadata
-        uses: actions/download-artifact@c8f1b937e962efbe62cc8278cbb3fd2ce3d7fc27 # v8.0.0
-        with:
-          name: certification-preview
-          path: ${{ runner.temp }}
       - name: Execute or verify Day 2 Consumer Upgrade
         env:
           STABLE_TAG: ${{ needs.prepare-candidate.outputs.stable_tag }}
@@ -210,8 +204,10 @@ jobs:
           DECLARED_BREAKING: ${{ needs.prepare-candidate.outputs.declared_breaking }}
           MIGRATION_DOC_PRESENT: ${{ needs.prepare-candidate.outputs.migration_doc_present }}
           EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
           SIMULATE_CLEANUP_FAILURE: ${{ vars.SIMULATE_CLEANUP_FAILURE }}
         run: |
+          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
           if [[ "$EVIDENCE_REUSED" == "true" && "${SIMULATE_CLEANUP_FAILURE:-false}" != "true" ]]; then
             verify_dir="$(mktemp -d)"
             git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
@@ -250,13 +246,13 @@ jobs:
               "$MIGRATION_DOC_PRESENT" \
               "$RUNNER_TEMP/day2.json"
           fi
-      - name: Upload Day 2 evidence
+      - name: Export Day 2 evidence
+        id: emit_day2
         if: always()
-        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v7.0.0
-        with:
-          name: certification-day2
-          path: ${{ runner.temp }}/day2.json
-          if-no-files-found: warn
+        run: |
+          if [[ -f "$RUNNER_TEMP/day2.json" ]]; then
+            echo "day2_json=$(jq -c '.' "$RUNNER_TEMP/day2.json")" >> "$GITHUB_OUTPUT"
+          fi
 
   contracts:
     name: Terraform certification
@@ -266,16 +262,13 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: read
+    outputs:
+      gate_report_json: ${{ steps.emit_gate.outputs.gate_report_json }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Download certification evidence artifacts
-        uses: actions/download-artifact@c8f1b937e962efbe62cc8278cbb3fd2ce3d7fc27 # v8.0.0
-        with:
-          path: ${{ runner.temp }}/evidence
-          merge-multiple: true
       - name: Evaluate Infrastructure Certification Gate
         env:
           CERTIFICATION_HOLD_VERSION: ${{ vars.CERTIFICATION_HOLD_VERSION }}
@@ -284,9 +277,18 @@ jobs:
           CONTRACTS_RESULT: ${{ needs.contract-tests.result }}
           DAY0_RESULT: ${{ needs.fresh-installation.result }}
           DAY2_RESULT: ${{ needs.consumer-upgrade.result }}
+          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
+          CONTRACTS_JSON: ${{ needs.contract-tests.outputs.contracts_json }}
+          DAY0_JSON: ${{ needs.fresh-installation.outputs.day0_json }}
+          DAY2_JSON: ${{ needs.consumer-upgrade.outputs.day2_json }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EXPECTED_TESTED_SHA: ${{ github.sha }}
         run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          [[ -n "$PREVIEW_JSON" ]] && printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/evidence/preview.json"
+          [[ -n "$CONTRACTS_JSON" ]] && printf '%s\n' "$CONTRACTS_JSON" > "$RUNNER_TEMP/evidence/contracts.json"
+          [[ -n "$DAY0_JSON" ]] && printf '%s\n' "$DAY0_JSON" > "$RUNNER_TEMP/evidence/day0.json"
+          [[ -n "$DAY2_JSON" ]] && printf '%s\n' "$DAY2_JSON" > "$RUNNER_TEMP/evidence/day2.json"
           git fetch --tags origin "+refs/heads/main:refs/remotes/origin/main" "$EXPECTED_HEAD_SHA"
           python3 scripts/certify/aggregate-gate.py \
             --preview-json "$RUNNER_TEMP/evidence/preview.json" \
@@ -300,13 +302,13 @@ jobs:
             --expected-head-sha "$EXPECTED_HEAD_SHA" \
             --expected-tested-sha "$EXPECTED_TESTED_SHA" \
             --output-json "$RUNNER_TEMP/gate-report.json"
-      - name: Upload aggregated certification report
+      - name: Export aggregated certification report
+        id: emit_gate
         if: always()
-        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v7.0.0
-        with:
-          name: certification-gate-report
-          path: ${{ runner.temp }}/gate-report.json
-          if-no-files-found: warn
+        run: |
+          if [[ -f "$RUNNER_TEMP/gate-report.json" ]]; then
+            echo "gate_report_json=$(jq -c '.' "$RUNNER_TEMP/gate-report.json")" >> "$GITHUB_OUTPUT"
+          fi
       - if: always()
         env:
           RESULT: ${{ job.status }}
@@ -340,14 +342,11 @@ jobs:
             git fetch origin "$TESTED_SHA"
             git checkout "$TESTED_SHA" -- scripts/release
           fi
-      - name: Download aggregated certification report
-        if: needs.contracts.result == 'success' || needs.contracts.result == 'failure'
-        uses: actions/download-artifact@c8f1b937e962efbe62cc8278cbb3fd2ce3d7fc27 # v8.0.0
-        with:
-          name: certification-gate-report
-          path: ${{ runner.temp }}
       - name: Update persistent PR comment
-        if: hashFiles(format('{0}/gate-report.json', runner.temp)) != ''
+        if: needs.contracts.outputs.gate_report_json != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/release/comment.cjs final "$RUNNER_TEMP/gate-report.json"
+          GATE_REPORT_JSON: ${{ needs.contracts.outputs.gate_report_json }}
+        run: |
+          printf '%s\n' "$GATE_REPORT_JSON" > "$RUNNER_TEMP/gate-report.json"
+          node scripts/release/comment.cjs final "$RUNNER_TEMP/gate-report.json"
