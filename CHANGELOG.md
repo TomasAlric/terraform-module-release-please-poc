@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.1.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.1.0...v7.1.1) (2026-11-27)
+
+
+### Correções
+
+* normalize whitespace in addon metadata maps ([#26](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/26)) ([992092d](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/992092db2791e7c7141fead8707a31bf759c56c8))
+
 ## [7.1.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.0.1...v7.1.0) (2026-11-26)
 
 

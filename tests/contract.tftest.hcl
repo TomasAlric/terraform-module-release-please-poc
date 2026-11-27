@@ -158,6 +158,19 @@ run "oci_architecture_alias" {
   }
 }
 
+run "normalized_addon_metadata" {
+  command = plan
+  variables {
+    addons         = { " dns " = " v1 " }
+    addon_channels = { " dns " = " stable " }
+    addon_owners   = { " dns " = " platform " }
+  }
+  assert {
+    condition     = output.cluster.addons["dns"] == "v1" && output.cluster.addon_channels["dns"] == "stable" && output.cluster.addon_owners["dns"] == "platform"
+    error_message = "Addon metadata keys and values must be trimmed."
+  }
+}
+
 run "default_maintenance_window" {
   command = plan
   assert {
