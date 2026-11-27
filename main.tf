@@ -8,7 +8,7 @@ locals {
     addons               = tomap({ for k, v in var.addons : trimspace(k) => trimspace(v) })
     addon_channels       = tomap({ for k, v in var.addon_channels : trimspace(k) => trimspace(v) })
     addon_owners         = tomap({ for k, v in var.addon_owners : trimspace(k) => trimspace(v) })
-    tags                 = tomap({ for k, v in var.tags : k => v if k != "upgraded" })
+    tags                 = var.tags
   }
 }
 
