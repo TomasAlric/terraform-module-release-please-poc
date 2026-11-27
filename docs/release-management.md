@@ -83,3 +83,31 @@ Os testes usaram o escopo declarado pelo owner. O writer precisa escrever conte�
 O repositório tem um colaborador administrador, zero reviews obrigatórios, dois rulesets de branch e releases mutáveis. Um Repository Secret depende da proteção das definições de workflow: alguém com capacidade de modificar e executar workflows confiáveis representa risco. Para adoção corporativa, exigir revisão independente dos CODEOWNERS em workflows, verificadores e dependências, restringir a liberação do secret a um environment protegido na main e avaliar uma identidade de serviço com escopo mínimo. A POC usa o PAT por decisão do owner.
 
 O grupo de concorrência serializa o publicador da POC. Outro escritor privilegiado ainda poderia mover/excluir tags ou substituir assets fora desse fluxo. Avaliar regras para criação de v* apenas pelo publicador e regras separadas que impeçam atualização e exclusão. Antes de habilitar imutabilidade, adaptar o upload do asset para uma release draft, anexar a prova e só então publicar. Arquivar logs e prova com retenção pelo período de suporte e assinatura independente. [Rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets) · [Imutabilidade](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
+
+## Operação da Fase 2 — Continuous Infrastructure Certification
+
+Na Fase 2, o workflow `.github/workflows/ci.yml` executa seis jobs coordenados em cada Pull Request destinado à `main`:
+
+1. `Release Version Preview & Candidate` (`prepare-candidate`): Executa a partir do checkout confiável de `refs/heads/main`, calcula a previsão de versão (`scripts/release/preview.cjs`), cria a tag candidata imutável e pre-release (`scripts/release/rc.cjs`) e publica/atualiza o comentário persistente em estado `PENDING` (`scripts/release/comment.cjs`).
+2. `Terraform Contract Tests` (`contract-tests`): Valida o título Conventional Commits do PR e executa `scripts/certify.sh` (incluindo verificação automática dos hashes `CI_POLICY` em `scripts/release/verify.py`).
+3. `Fresh Installation Certification` (`fresh-installation`): Executa `scripts/certify/run-day0.sh` consumindo a referência candidata remota via Git nos cenários `fresh_defaults` e `fresh_custom`.
+4. `Consumer Upgrade & Impact Analysis` (`consumer-upgrade`): Executa `scripts/certify/run-day2.sh` e `scripts/certify/analyze-plan.py` validando o upgrade in-place da última release estável para a candidata no mesmo `terraform.tfstate` em 5 cenários de consumidores, bloqueando qualquer substituição (`replace`) ou exclusão (`delete`) de recursos críticos antes do `apply`.
+5. `Terraform certification` (`contracts`): Gate agregador exigido pelo ruleset `28132014` na `main`. Executa `scripts/certify/aggregate-gate.py`, verifica que nenhum job obrigatório falhou, foi cancelado ou ignorado, valida a atualidade da branch base (`origin/main`), o cleanup e a política de upgrade, e grava `CERTIFICATION_EVIDENCE_JSON` no log do job.
+6. `Publish Release Impact Comment` (`publish-comment`): Atualiza o comentário persistente do PR com a tabela final, contagens de impacto do plano e diagnósticos.
+
+### Manutenção da política `CI_POLICY`
+
+Sempre que `.github/workflows/ci.yml`, `scripts/certify.sh` ou qualquer script em `scripts/certify/*` for modificado intencionalmente:
+
+1. Calcule os novos hashes Git com `git hash-object .github/workflows/ci.yml scripts/certify.sh scripts/certify/*`.
+2. Atualize o dicionário `CI_POLICY` em `scripts/release/verify.py`.
+3. Execute `bash scripts/certify.sh` localmente para confirmar que todos os hashes coincidem antes de abrir o PR.
+
+### Auditoria das releases da Fase 2
+
+O script `scripts/audit-release.py` é compatível tanto com as releases da Fase 1 (`policy_version: 1`) quanto com as releases da Fase 2 (`policy_version: 2`):
+
+```sh
+python3 scripts/audit-release.py v7.1.1 28 45989998572
+python3 scripts/audit-release.py v7.2.0 29 45991745368
+```
