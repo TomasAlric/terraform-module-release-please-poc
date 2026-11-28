@@ -1,5 +1,6 @@
 """Uso: python3 scripts/audit-release.py TAG PR RUN_ID (checkout com gh autenticado)."""
 import base64
+import hashlib
 import json
 import re
 import subprocess
@@ -59,7 +60,10 @@ result = {
     "ci": run["html_url"],
     "release": release["html_url"],
 }
-if any(a["name"] == "certification.json" for a in release.get("assets", [])):
+has_certificate = any(a["name"] == "certification.json" for a in release.get("assets", []))
+if tag not in legacy and tag != "v7.0.1":  # certificates started in v7.1.0
+    assert has_certificate, "published certificate missing"
+if has_certificate:
     cert_raw = github("release", "download", tag, "--repo", repo, "--pattern", "certification.json", "--output", "-")
     cert_doc = json.loads(cert_raw)
     assert cert_doc["certified_tree"] == tree and cert_doc["merge_commit"] == commit["sha"]
@@ -71,4 +75,17 @@ if any(a["name"] == "certification.json" for a in release.get("assets", [])):
         result["release_candidate"] = cert_doc["release_candidate"]["reference"]
         result["upgrade_impact"] = cert_doc["upgrade_impact"]
         result["policy_version"] = cert_doc["policy_version"]
+    if cert_doc.get("policy_version") == 3:
+        annotation = api("git/ref/tags/" + tag)["object"]
+        assert annotation["type"] == "tag"
+        target = api("git/tags/" + annotation["sha"])
+        assert target["object"]["sha"] == commit["sha"] and target["object"]["type"] == "commit"
+        proposal = {"proof": cert_doc, "name": release["name"], "notes": release["body"]}
+        encoded = json.dumps(proposal, separators=(",", ":"), ensure_ascii=False).encode()
+        digest = hashlib.sha256(encoded).hexdigest()
+        assert target["message"].strip() == "proposal-sha256 " + digest
+        assert cert_doc["run_id"] == int(run_id) and cert_doc["candidate_head"] == run["head_sha"]
+        assert cert_doc["evidence_reuse"]["reused"] is False
+        result["proposal_sha256"] = digest
+        result["tag_object"] = annotation["sha"]
 print(json.dumps(result))
