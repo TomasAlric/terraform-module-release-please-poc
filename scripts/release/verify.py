@@ -1,5 +1,6 @@
 """Verify a Release Please candidate using read-only repository and Actions data."""
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -8,12 +9,13 @@ import subprocess
 REPO = "TomasAlric/terraform-module-release-please-poc"
 BRANCH = "release-please--branches--main"
 CI_POLICY = {
-    ".github/workflows/ci.yml": "563866a60b6d3bd74638bf2c9929395bcaabda52",
+    "scripts/release/preview.cjs": "a900086806b18a5dc563e47048daf933fcfb7903",
+    ".github/workflows/ci.yml": "ecfd294dde84145891aa2c5bc81bd46316cab559",
     "scripts/certify.sh": "062e851fab50d0e46c7c639522affd663a078c31",
     "scripts/certify/analyze-plan.py": "e28894b8fbead601723aac633821755838556dc1",
-    "scripts/certify/run-day0.sh": "28772db629b832aef5964c1191611aab66fb0e03",
-    "scripts/certify/run-day2.sh": "8c8340acaeb58043a93e027b40c9bf1d286d2987",
-    "scripts/certify/aggregate-gate.py": "08cb3c569b28557672e6cd4b8be7580e6b644c0c",
+    "scripts/certify/run-day0.sh": "e91c0476925caae04143f8879e080cc3ac22ead1",
+    "scripts/certify/run-day2.sh": "05aee70781fc88d3c4469fe555e5515bfb40011d",
+    "scripts/certify/aggregate-gate.py": "0b9d32d9e6ba6418ddde1d9853e54d1dfd2e0745",
 }
 REQUIRED_JOBS = {
     "Release Version Preview & Candidate",
@@ -76,6 +78,7 @@ def verify(merge, tag, number):
             and run["head_repository"]["full_name"] == REPO, "CI identity or result mismatch")
     jobs = api(f"actions/runs/{run_id}/attempts/{attempt}/jobs")["jobs"]
     by_name = {j["name"]: j for j in jobs}
+    require(len(by_name) == len(jobs), "ambiguous job identities")
     for req_name in REQUIRED_JOBS:
         require(req_name in by_name, f"missing mandatory certification job: {req_name}")
         j = by_name[req_name]
@@ -99,12 +102,17 @@ def verify(merge, tag, number):
     require(tested["tree"]["sha"] == tree == command("git", "rev-parse", merge + "^{tree}"),
             "published content differs from tested tree")
 
-    ev_matches = re.findall(r"CERTIFICATION_EVIDENCE_JSON=(\{[^\r\n]+\})", log)
+    ev_matches = re.findall(r"^Terraform certification\tEvaluate Infrastructure Certification Gate\t[0-9T:Z.-]+ CERTIFICATION_EVIDENCE_JSON=(\{[^\r\n]+\})$", log, re.M)
     require(len(ev_matches) == 1, "missing or ambiguous CERTIFICATION_EVIDENCE_JSON in log")
     evidence = json.loads(ev_matches[0])
     require(evidence.get("repository") == REPO and int(evidence.get("pr_number", 0)) == number,
             "evidence repository or pull request mismatch")
     require(evidence.get("version") == tag[1:], "evidence predicted version does not match release tag")
+    metadata = json.dumps([pr["title"].strip(), (pr["body"] or "").strip()], ensure_ascii=False, separators=(",", ":"))
+    require(evidence.get("metadata_digest") == hashlib.sha256(metadata.encode()).hexdigest(), "PR metadata changed")
+    require(evidence.get("policy_version") == 3 and evidence.get("workflow_run_id") == str(run_id)
+            and evidence.get("attempt") == str(attempt) and evidence.get("evidence_reuse", {}).get("reused") is False,
+            "run, attempt, policy or fresh evidence mismatch")
     rc = evidence.get("release_candidate", {})
     require(rc.get("reference") and rc.get("tree_sha") == tree and rc.get("head_sha") == head,
             "evidence release candidate coordinates mismatch")
@@ -114,7 +122,12 @@ def verify(merge, tag, number):
 
     rc_tag_ref = f"refs/tags/{rc['reference']}"
     remote_rc = command("git", "ls-remote", "origin", rc_tag_ref)
-    require(bool(remote_rc), f"release candidate tag {rc['reference']} not found on origin")
+    require(rc.get("tested_sha") == synthetic and rc.get("base_sha") == base
+            and rc.get("commit_sha") in {synthetic, head}
+            and command("git", "rev-parse", rc["commit_sha"] + "^{tree}") == tree,
+            "candidate content or tested revision mismatch")
+    require(rc["reference"].startswith(f"{tag}-rc.pr{number}.{head[:7]}"), "unexpected candidate reference")
+    require(remote_rc.split() == [rc["commit_sha"], rc_tag_ref], f"release candidate tag {rc['reference']} not found on origin")
 
     return dict(
         repository=REPO,
@@ -130,7 +143,7 @@ def verify(merge, tag, number):
         attempt=attempt,
         job_id=job["id"],
         result="success",
-        policy_version=2,
+        policy_version=3,
         certified_at=job["completed_at"],
         release_candidate=dict(
             reference=rc["reference"],
@@ -149,7 +162,7 @@ def verify(merge, tag, number):
             published_sha=merge,
             certified_tree=tree,
             workflow_run_id=str(run_id),
-            policy_version="2.0",
+            policy_version="3.0",
         ),
     )
 

@@ -2,6 +2,7 @@
 const { execFileSync } = require('node:child_process');
 const { appendFileSync, writeFileSync, mkdtempSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { createHash } = require('node:crypto');
 const { GitHub, Manifest } = require('release-please');
 const { TagName } = require('release-please/build/src/util/tag-name');
 
@@ -34,10 +35,19 @@ async function publish(github) {
       run('git', 'rev-parse', proof.merge_commit + '^{tree}') !== proof.certified_tree) {
     throw Error('Invalid certification contract');
   }
-  // A normal push creates the exact ref or refuses an existing, different tag.
-  run('git', 'push', 'origin', proof.merge_commit + ':' + ref);
+  // The first durable side effect commits to the complete approved proposal.
+  // A retry constructs the same object, including its original certification timestamp.
+  const digest = createHash('sha256').update(JSON.stringify({ proof, name, notes })).digest('hex');
+  const timestamp = Date.parse(proof.certified_at) / 1000;
+  if (!Number.isSafeInteger(timestamp) || !/^v\d+\.\d+\.\d+$/.test(tag)) throw Error('Invalid tag coordinates');
+  const annotation = `object ${proof.merge_commit}\ntype commit\ntag ${tag}\n` +
+    `tagger Certified release <release@users.noreply.github.com> ${timestamp} +0000\n\nproposal-sha256 ${digest}\n`;
+  const tagObject = execFileSync('git', ['mktag'], {input: annotation, encoding:'utf8'}).trim();
+  run('git', 'push', 'origin', tagObject + ':' + ref);
   const checkRef = () => {
-    if (run('git', 'ls-remote', 'origin', ref).split(/\s/)[0] !== proof.merge_commit) throw Error('Tag mismatch');
+    const remote = run('git', 'ls-remote', 'origin', ref, ref + '^{}');
+    if (!remote.split('\n').includes(tagObject + '\t' + ref) ||
+        !remote.split('\n').includes(proof.merge_commit + '\t' + ref + '^{}')) throw Error('Tag or authorization mismatch');
   };
   checkRef();
   const repo = 'repos/' + proof.repository;
@@ -50,7 +60,8 @@ async function publish(github) {
     await github.createRelease({ name, tag: TagName.parse(tag), notes, sha: proof.merge_commit });
   }
   const release = JSON.parse(run('gh', 'api', releasePath));
-  if (release.author.id !== 82914085 || release.body.trim() !== notes.trim() || release.draft) {
+  if (release.author.id !== 82914085 || release.body.trim() !== notes.trim() || release.draft ||
+      release.prerelease || release.tag_name !== tag || release.name !== name || release.target_commitish !== proof.merge_commit) {
     throw Error('Unexpected published release');
   }
   checkRef();
@@ -64,8 +75,13 @@ async function publish(github) {
     writeFileSync(file, expected);
     run('gh', 'release', 'upload', tag, file);
   }
-  run('gh', 'issue', 'edit', String(proof.pull_request), '--add-label', 'autorelease: tagged');
-  run('gh', 'issue', 'edit', String(proof.pull_request), '--remove-label', 'autorelease: pending');
+  // Confirm bytes after upload as well as on retries, before marking publication complete.
+  if (run('gh', 'release', 'download', tag, '--pattern', 'certification.json', '--output', '-') !== expected.trim()) {
+    throw Error('Uploaded certificate mismatch');
+  }
+  checkRef();
+  run('gh', 'issue', 'edit', String(proof.pull_request), '--add-label', 'autorelease: tagged',
+    '--remove-label', 'autorelease: pending');
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, release.html_url + '\n' + JSON.stringify(proof) + '\n');
 }
 
@@ -76,4 +92,5 @@ async function main() {
   if (process.argv[2] === 'publish') return publish(github);
   throw Error('Unknown publication operation');
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+module.exports = { publish };
+if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });

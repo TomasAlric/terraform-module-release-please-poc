@@ -12,7 +12,7 @@ REPO_URL="${7:-https://github.com/TomasAlric/terraform-module-release-please-poc
 REPO_ROOT="$(pwd)"
 
 EXPECTED_MODULE_HASH="$(
-  shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}'
+  git rev-parse 'HEAD^{tree}'
 )"
 
 WORK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/day2-cert-XXXXXX")"
@@ -513,7 +513,7 @@ run_upgrade_scenario() {
   local downloaded_hash
   downloaded_hash="$(
     cd "$dir/.terraform/modules/cluster" &&
-    shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}'
+    git rev-parse 'HEAD^{tree}'
   )"
   if [[ "$downloaded_hash" != "$EXPECTED_MODULE_HASH" ]]; then
     FAILURE_REASON="Upgraded candidate module content hash ($downloaded_hash) differs from certified workspace hash ($EXPECTED_MODULE_HASH)"

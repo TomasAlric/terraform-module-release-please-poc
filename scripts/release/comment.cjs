@@ -28,6 +28,7 @@ function buildPendingComment(preview) {
 
   const lines = [
     MARKER,
+    `<!-- metadata ${preview.metadata_digest} -->`,
     '## Release Impact & Certification',
     '',
     `Current stable version: ${preview.current_stable_tag}`,
@@ -65,123 +66,42 @@ function buildPendingComment(preview) {
   return lines.join('\n');
 }
 
-function buildFinalComment(report) {
-  const preview = report.preview;
-  const cert = report.certification;
-  const impact = report.upgrade_impact || { create: 0, update: 0, replace: 0, delete: 0 };
-  const policy = report.upgrade_policy_details || {
-    critical_resource_preservation: cert.upgrade_impact_policy === 'PASS' ? 'PASS' : 'FAIL',
-    contract_compatibility: cert.upgrade_impact_policy === 'PASS' ? 'PASS' : 'FAIL',
-    upgrade_authorization: cert.upgrade_impact_policy === 'PASS' ? 'PASS' : 'FAIL',
-  };
-  const repo = preview.repository;
-  const runUrl = `https://github.com/${repo}/actions/runs/${preview.workflow_run_id}`;
-  const candidateUrl =
-    preview.rc_status?.candidate_url || `https://github.com/${repo}/tree/${encodeURIComponent(preview.candidate_tag)}`;
-  const nextVersionDisplay = preview.expected_next_tag
-    ? preview.expected_next_tag
-    : 'None (no release triggered — remains ' + preview.current_stable_tag + ')';
+function botComment(comment) {
+  return comment.user?.id === 41898282 && comment.body?.startsWith(MARKER);
+}
 
-  const incompatibilityDisplay =
-    report.detected_incompatibilities && report.detected_incompatibilities.length > 0
-      ? `Detected (${report.detected_incompatibilities.map(sanitizeText).join('; ')})`
-      : 'None detected';
+function commentsFor(repo, number) {
+  return JSON.parse(run('gh', ['api', '--paginate', '--slurp', `repos/${repo}/issues/${number}/comments`])).flat();
+}
 
-  const reuseDisplay = preview.evidence_reuse?.reused
-    ? `Reused authenticated evidence from run #${preview.evidence_reuse.source_run_id} (fingerprint \`${preview.equivalence_fingerprint.slice(0, 12)}\`)`
-    : `Full certification executed (${sanitizeText(preview.evidence_reuse?.reason || 'primary execution')})`;
-
-  const lines = [
-    MARKER,
-    '## Release Impact & Certification',
-    '',
-    `Current stable version: ${preview.current_stable_tag}`,
-    `Expected next version: ${nextVersionDisplay}`,
-    `Release type: ${preview.release_type}`,
-    `Breaking changes: ${sanitizeText(preview.breaking_summary)}`,
-    '',
-    'Candidate:',
-    `${preview.candidate_tag}`,
-    '',
-    `Candidate SHA: ${preview.head_sha}`,
-    `Base SHA: ${preview.base_sha}`,
-    `Tested Merge SHA: ${preview.tested_sha}`,
-    `Certified Tree SHA: ${preview.tree_sha}`,
-    '',
-    'Infrastructure certification:',
-    '',
-    '| Validation | Status |',
-    '|---|---|',
-    `| Terraform Contract Tests | ${cert.terraform_contracts} |`,
-    `| Fresh Installation | ${cert.fresh_installation} |`,
-    `| Consumer Upgrade | ${cert.consumer_upgrade} |`,
-    `| Upgrade Plan Policy | ${cert.upgrade_impact_policy} |`,
-    `| Post-upgrade Idempotency | ${cert.post_upgrade_idempotency} |`,
-    `| Cleanup | ${cert.cleanup} |`,
-    '',
-    `Overall result: ${cert.result}`,
-    '',
-    '### Upgrade Impact',
-    '',
-    `Stable: ${preview.current_stable_tag}`,
-    `Candidate: ${preview.candidate_tag}`,
-    '',
-    `Create: ${impact.create}`,
-    `Update: ${impact.update}`,
-    `Replace: ${impact.replace}`,
-    `Delete: ${impact.delete}`,
-    '',
-    `Critical resource preservation: ${policy.critical_resource_preservation}`,
-    `Contract compatibility: ${policy.contract_compatibility}`,
-    `Upgrade authorization: ${policy.upgrade_authorization}`,
-    '',
-    '### Evidence & Traceability',
-    `- **Declared breaking changes**: ${sanitizeText(preview.breaking_summary)}`,
-    `- **Detected contract/upgrade incompatibility**: ${incompatibilityDisplay}`,
-    `- **Evidence reuse**: ${reuseDisplay}`,
-    `- **Equivalence fingerprint**: \`${preview.equivalence_fingerprint}\``,
-    `- **Candidate reference**: [\`${preview.candidate_tag}\`](${candidateUrl})`,
-    `- **Workflow run**: [Run #${preview.workflow_run_id} (attempt ${preview.workflow_run_attempt})](${runUrl})`,
-  ];
-
-  if (report.failures && report.failures.length > 0) {
-    lines.push('', '### Failure Diagnostics');
-    for (const f of report.failures) {
-      lines.push(`- **FAIL**: ${sanitizeText(f)}`);
-    }
-  }
-
-  lines.push(
-    '',
-    cert.result === 'PASS'
-      ? 'Publication: Pending protected merge and final certification.'
-      : 'Publication: BLOCKED — certification checks failed or incomplete.',
-    '',
-    'This version is a preview and may change before publication.'
-  );
-
-  return lines.join('\n');
+function reportCompleted(repo) {
+  const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH));
+  const ci = event.workflow_run;
+  if (ci.path !== '.github/workflows/ci.yml' || ci.event !== 'pull_request' ||
+      ci.repository.full_name !== repo || ci.pull_requests.length !== 1) return;
+  const number = ci.pull_requests[0].number;
+  const pr = JSON.parse(run('gh', ['api', `repos/${repo}/pulls/${number}`]));
+  if (pr.state !== 'open' || pr.head.sha !== ci.head_sha || pr.base.ref !== 'main') return;
+  const latest = JSON.parse(run('gh', ['api',
+    `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${ci.head_sha}&event=pull_request&per_page=1`])).workflow_runs[0];
+  if (latest?.id !== ci.id || latest.run_attempt !== ci.run_attempt) return;
+  const comment = commentsFor(repo, number).find(botComment);
+  const digest = require('node:crypto').createHash('sha256').update(JSON.stringify([pr.title.trim(), (pr.body || '').trim()])).digest('hex');
+  if (!comment?.body.includes(`<!-- metadata ${digest} -->`) ||
+      !comment.body.includes(`Candidate SHA: ${pr.head.sha}`) || !comment.body.includes(`Base SHA: ${pr.base.sha}`)) return;
+  const {jobs} = JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${ci.id}/attempts/${ci.run_attempt}/jobs`]));
+  const body = comment.body.split('Infrastructure certification:')[0] + 'Infrastructure certification:\n\n' +
+    jobs.map(j => `- [${j.name.replace(/[^a-z0-9 &-]/gi, '')}](${j.html_url}) · ${j.conclusion}`).join('\n') +
+    `\n\nOverall result: ${ci.conclusion.toUpperCase()}\n\n[Execution and evidence](${ci.html_url})`;
+  run('gh',['api',`repos/${repo}/issues/comments/${comment.id}`,'-X','PATCH','--input','-'],JSON.stringify({body}));
 }
 
 function upsertComment(repo, prNumber, body) {
-  const commentsJson = run('gh', ['api', '--paginate', `repos/${repo}/issues/${prNumber}/comments`]);
-  const comments = JSON.parse(commentsJson);
-  const matching = comments.filter(c => typeof c.body === 'string' && c.body.includes('<!-- release-impact-certification-marker'));
-
-  if (matching.length > 0) {
-    const targetId = matching[0].id;
-    const payload = JSON.stringify({ body });
-    const updated = JSON.parse(
-      run('gh', ['api', `repos/${repo}/issues/comments/${targetId}`, '-X', 'PATCH', '--input', '-'], payload)
-    );
-    // Clean up any duplicate marker comments if they ever existed
-    for (let i = 1; i < matching.length; i++) {
-      try {
-        run('gh', ['api', `repos/${repo}/issues/comments/${matching[i].id}`, '-X', 'DELETE']);
-      } catch {
-        // ignore
-      }
-    }
+  const existing = commentsFor(repo, prNumber).find(botComment);
+  if (existing) {
+    const targetId = existing.id;
+    const updated = JSON.parse(run('gh', ['api', `repos/${repo}/issues/comments/${targetId}`,
+      '-X','PATCH','--input','-'], JSON.stringify({body})));
     console.log(`Updated existing PR #${prNumber} comment ${targetId}: ${updated.html_url}`);
     return updated;
   } else {
@@ -216,8 +136,7 @@ function invalidateStaleOpenPrs(repo) {
 
   for (const pr of openPrs) {
     if (pr.headRefName === 'release-please--branches--main') continue;
-    const comments = JSON.parse(run('gh', ['api', '--paginate', `repos/${repo}/issues/${pr.number}/comments`]));
-    const existing = comments.find(c => typeof c.body === 'string' && c.body.includes('<!-- release-impact-certification-marker'));
+    const existing = commentsFor(repo, pr.number).find(botComment);
     if (!existing) continue;
 
     const baseMatch = existing.body.match(/^Base SHA:\s*([0-9a-f]{40})/m);
@@ -245,6 +164,7 @@ function main() {
   const filePath = process.argv[3];
   const repo = process.env.GITHUB_REPOSITORY || 'TomasAlric/terraform-module-release-please-poc';
 
+  if (mode === 'completed') return reportCompleted(repo);
   if (mode === 'invalidate-stale') {
     invalidateStaleOpenPrs(repo);
     return;
@@ -258,9 +178,6 @@ function main() {
   if (mode === 'pending') {
     const body = buildPendingComment(data);
     upsertComment(data.repository, data.pr_number, body);
-  } else if (mode === 'final') {
-    const body = buildFinalComment(data);
-    upsertComment(data.preview.repository, data.preview.pr_number, body);
   } else {
     throw new Error(`Unknown comment mode: ${mode}`);
   }

@@ -3,7 +3,9 @@ require('release-please');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { writeFileSync } = require('node:fs');
-const { TerraformModule } = require('release-please/build/src/strategies/terraform-module');
+const { Manifest } = require('release-please');
+const { LocalGitHub } = require('release-please/build/src/local-github');
+const { buildStrategy } = require('release-please/build/src/factory');
 const { parseConventionalCommits } = require('release-please/build/src/commit');
 const { TagName } = require('release-please/build/src/util/tag-name');
 const { Version } = require('release-please/build/src/version');
@@ -48,6 +50,18 @@ function classifyIncrement(currentStr, nextStr) {
   return 'NONE';
 }
 
+function validateBaseline(release, anchor, proof, repo, tag, sha, tree) {
+  if (release.tag_name !== tag || release.draft || release.prerelease) throw Error('Incomplete stable release');
+  if (anchor?.tag === tag) {
+    if (anchor.repository !== repo || anchor.release_id !== release.id || anchor.commit !== sha) {
+      throw Error('Manual baseline differs from reviewed adoption inventory');
+    }
+  } else if (release.target_commitish !== sha || proof?.repository !== repo || proof.version !== tag.slice(1) ||
+             proof.merge_commit !== sha || proof.certified_tree !== tree || proof.result !== 'success') {
+    throw Error('Stable certificate differs from published tag or manifest');
+  }
+}
+
 async function main() {
   const repo = process.env.GITHUB_REPOSITORY || 'TomasAlric/terraform-module-release-please-poc';
   const prNumber = Number(process.env.PR_NUMBER || 0);
@@ -74,11 +88,13 @@ async function main() {
   const stableTagSha = run('git', ['rev-parse', '--verify', `refs/tags/${currentStableTag}^{commit}`]);
   run('git', ['merge-base', '--is-ancestor', stableTagSha, currentMainSha]);
   const published = JSON.parse(run('gh', ['api', `repos/${repo}/releases/latest`]));
-  if (published.tag_name !== currentStableTag || published.draft || published.prerelease ||
-      published.target_commitish !== stableTagSha ||
-      !published.assets.some(asset => asset.name === 'certification.json' && asset.state === 'uploaded')) {
-    throw Error('Stable release is incomplete or inconsistent with manifest and tag. Reconcile publication.');
-  }
+  const anchorRaw = tryRun('git', ['show', `${currentMainSha}:.release/brownfield.json`]);
+  const anchor = anchorRaw ? JSON.parse(anchorRaw) : null;
+  const proof = anchor?.tag === currentStableTag ? null : JSON.parse(run('gh', [
+    'release', 'download', currentStableTag, '--repo', repo, '--pattern', 'certification.json', '--output', '-',
+  ]));
+  validateBaseline(published, anchor, proof, repo, currentStableTag, stableTagSha,
+    run('git', ['rev-parse', `${stableTagSha}^{tree}`]));
 
   // 2. Check base branch freshness & ancestry
   let isMainAncestorOfHead = false;
@@ -104,19 +120,10 @@ async function main() {
   });
 
   // 4. Configure Release Please TerraformModule strategy
-  const configRaw = gitShowAt(currentMainSha, 'release-please-config.json');
-  const config = JSON.parse(configRaw).packages['.'];
   const [owner, repoName] = repo.split('/');
-  const strategy = new TerraformModule({
-    github: {
-      repository: { owner, repo: repoName },
-      findFilesByFilenameAndRef: async () => [],
-    },
-    targetBranch: 'main',
-    includeComponentInTag: config['include-component-in-tag'],
-    includeVInTag: config['include-v-in-tag'],
-    changelogSections: config['changelog-sections'],
-  });
+  const scm = new LocalGitHub({ owner, repo: repoName, defaultBranch: 'main' }, {}, process.cwd());
+  const manifest = await Manifest.fromManifest(scm, currentMainSha);
+  const strategy = await buildStrategy({ ...manifest.repositoryConfig['.'], path: '.', github: scm, targetBranch: currentMainSha });
   const baselineRelease = {
     tag: TagName.parse(currentStableTag),
     sha: stableTagSha,
@@ -281,7 +288,8 @@ async function main() {
   console.log(jsonOutput);
 }
 
-main().catch(err => {
+module.exports = { computeEquivalenceContract, validateBaseline };
+if (require.main === module) main().catch(err => {
   console.error(err);
   process.exitCode = 1;
 });

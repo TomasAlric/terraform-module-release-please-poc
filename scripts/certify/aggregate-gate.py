@@ -214,6 +214,10 @@ def main():
 
     # Emit single-line machine-verifiable evidence record to job log for pre-publication verify.py
     compact_evidence = {
+        "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+        "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+        "metadata_digest": preview["metadata_digest"] if preview else None,
+        "policy_version": 3,
         "repository": report["repository"],
         "pr_number": report["pr_number"],
         "version": report["version"],
