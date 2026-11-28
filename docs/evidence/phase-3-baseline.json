@@ -1,0 +1,238 @@
+{
+  "main": "f680a2f3933c5796d1479adb6a464480cf9db814",
+  "refs": {
+    "refs/tags/candidate/pr-25/7187b3f": "7187b3f01a82193cbee6f896cf554f487ab11193",
+    "refs/tags/candidate/pr-30/61d7f23": "61d7f238f54a43206116a72f107b908ca14cd673",
+    "refs/tags/v6.2.0": "6042bf2bff2cf45cba858c4bae677709120d6298",
+    "refs/tags/v6.2.1": "e39cbc4984b2388be44a3c45a3ae3ca26b00a14b",
+    "refs/tags/v6.3.0": "eeb9208b5e8d863c5606db275b9d53483d69cd6b",
+    "refs/tags/v7.0.0": "70b0f83a10fde9174b949e92c9901de78e6e9086",
+    "refs/tags/v7.0.1": "d1ccee5653cc6c1ac703e0f09ee73c4a2c1c8a8a",
+    "refs/tags/v7.1.0": "7094d1b149697f366165ea756fb6cee9dbbac1fe",
+    "refs/tags/v7.1.1": "51317507dd5f7a997d11e1ae25972d28f5237653",
+    "refs/tags/v7.1.1-rc.pr26.b46ee01": "b46ee013e461550e23fc5af569bac39361652fbf",
+    "refs/tags/v7.1.1-rc.pr26.d299f87": "d299f8701411c6112fccd7ce46188277f22fdf21",
+    "refs/tags/v7.1.1-rc.pr26.e57c8f6": "e57c8f6f83a0d673fc5df82c44908ccbf71c818d",
+    "refs/tags/v7.1.1-rc.pr28.f0a7758": "f0a7758d800d87d6fe0599f9b8668805e44f2d10",
+    "refs/tags/v7.2.0": "3bbce0ae0c461668d68566390c45b3520476fdc9",
+    "refs/tags/v7.2.0-rc.pr27.3085955": "308595564b884f80c0286bacc60dddd45a1fb2bd",
+    "refs/tags/v7.2.0-rc.pr27.835922c": "835922c5003c656cab906883f342faba5dfce02a",
+    "refs/tags/v7.2.0-rc.pr29.1c3e58e": "1c3e58ee7d443165844db1d883af8dbcec1b2985",
+    "refs/tags/v8.0.0-rc.pr27.3085955": "308595564b884f80c0286bacc60dddd45a1fb2bd"
+  },
+  "releases": [
+    {
+      "tag": "v8.0.0-rc.pr27.3085955",
+      "release_id": 460502435,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v8.0.0-rc.pr27.3085955",
+      "prerelease": true,
+      "commit": "308595564b884f80c0286bacc60dddd45a1fb2bd",
+      "tree": "554d214abf60c0cd970075a516066db0d5669765",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "e8bfd615f0bc5b57bfd686a37eacb7b126d8c78440ac39dda0ae0a61a8b9b45c",
+      "assets": []
+    },
+    {
+      "tag": "v7.2.0",
+      "release_id": 460527496,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.2.0",
+      "prerelease": false,
+      "commit": "3bbce0ae0c461668d68566390c45b3520476fdc9",
+      "tree": "a926f7e799b8d1abfb4b456b40395912351d0f19",
+      "changelog_blob": "5521096765469acda5e100b6f109cd88fd98214b",
+      "manifest_blob": "ae4f6d80a54efe9023990573408d2f5220eab686",
+      "notes_sha256": "b8770fef35eaef44e2b9c8096718db8a6d0cddcbf7d6da4fa2183d5101ed7b91",
+      "assets": [
+        {
+          "id": 800256818,
+          "name": "certification.json",
+          "size": 1825,
+          "digest": "sha256:47300f14305b8d89fce21d6f5ee97c76866b3b78cd7e4832d04324c3a7595bae"
+        }
+      ]
+    },
+    {
+      "tag": "v7.2.0-rc.pr29.1c3e58e",
+      "release_id": 460523330,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.2.0-rc.pr29.1c3e58e",
+      "prerelease": true,
+      "commit": "1c3e58ee7d443165844db1d883af8dbcec1b2985",
+      "tree": "a926f7e799b8d1abfb4b456b40395912351d0f19",
+      "changelog_blob": "5521096765469acda5e100b6f109cd88fd98214b",
+      "manifest_blob": "ae4f6d80a54efe9023990573408d2f5220eab686",
+      "notes_sha256": "acb8f09eec2cc2b31dea550dc54f5b5bbb17a9f3c5a341846caff9282bf73366",
+      "assets": []
+    },
+    {
+      "tag": "v7.2.0-rc.pr27.835922c",
+      "release_id": 460520886,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.2.0-rc.pr27.835922c",
+      "prerelease": true,
+      "commit": "835922c5003c656cab906883f342faba5dfce02a",
+      "tree": "056963ffd179aa58712ae59708a1706c9e021f92",
+      "changelog_blob": "0de729e02a4bac265b5280ae79979f5587269fea",
+      "manifest_blob": "cf58de63a17ede036f8cd0e29b0c7b88cde69ae3",
+      "notes_sha256": "900086d6043c08e61f16876f18d761cef01e050175e723270e0915b0bc9d9c2c",
+      "assets": []
+    },
+    {
+      "tag": "v7.2.0-rc.pr27.3085955",
+      "release_id": 460504083,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.2.0-rc.pr27.3085955",
+      "prerelease": true,
+      "commit": "308595564b884f80c0286bacc60dddd45a1fb2bd",
+      "tree": "554d214abf60c0cd970075a516066db0d5669765",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "9803e0367e689283e6fb64d6a0b65360f8d060af393b13cac04bb37cd929d142",
+      "assets": []
+    },
+    {
+      "tag": "v7.1.1",
+      "release_id": 460516343,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.1",
+      "prerelease": false,
+      "commit": "51317507dd5f7a997d11e1ae25972d28f5237653",
+      "tree": "d7f8f60b191a9b23a474b3560bdde74b0cfebc6c",
+      "changelog_blob": "0de729e02a4bac265b5280ae79979f5587269fea",
+      "manifest_blob": "cf58de63a17ede036f8cd0e29b0c7b88cde69ae3",
+      "notes_sha256": "27091c2ef9454327e428007f3c4b7b0e9c61621cc453090c1a56f0678d4a0794",
+      "assets": [
+        {
+          "id": 800221325,
+          "name": "certification.json",
+          "size": 3068,
+          "digest": "sha256:17c7fa8b24dd260a0282b9a1975b9e060e630ad6aa2896898dacc20ab1fc3a78"
+        }
+      ]
+    },
+    {
+      "tag": "v7.1.1-rc.pr28.f0a7758",
+      "release_id": 460511146,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.1-rc.pr28.f0a7758",
+      "prerelease": true,
+      "commit": "f0a7758d800d87d6fe0599f9b8668805e44f2d10",
+      "tree": "d7f8f60b191a9b23a474b3560bdde74b0cfebc6c",
+      "changelog_blob": "0de729e02a4bac265b5280ae79979f5587269fea",
+      "manifest_blob": "cf58de63a17ede036f8cd0e29b0c7b88cde69ae3",
+      "notes_sha256": "752fcf7b1b368466f5f039a211bef5290d481a8673eff0be957f4877d3da6faa",
+      "assets": []
+    },
+    {
+      "tag": "v7.1.1-rc.pr26.e57c8f6",
+      "release_id": 460191908,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.1-rc.pr26.e57c8f6",
+      "prerelease": true,
+      "commit": "e57c8f6f83a0d673fc5df82c44908ccbf71c818d",
+      "tree": "e913a0611547bb50d462385277af0ea3b9594c04",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "6fab2b3e8758027fdd629f6538b684975e8745e9ec33544f513cad5f0e246d9e",
+      "assets": []
+    },
+    {
+      "tag": "v7.1.1-rc.pr26.d299f87",
+      "release_id": 460190250,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.1-rc.pr26.d299f87",
+      "prerelease": true,
+      "commit": "d299f8701411c6112fccd7ce46188277f22fdf21",
+      "tree": "40c9d91da5fcb4084d3f72e38fb946ac63dc1187",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "564893722edf7b6934b95aea1cd01d901dcaa15ada7e29d9b3c127da2dbd748b",
+      "assets": []
+    },
+    {
+      "tag": "v7.1.1-rc.pr26.b46ee01",
+      "release_id": 460193376,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.1-rc.pr26.b46ee01",
+      "prerelease": true,
+      "commit": "b46ee013e461550e23fc5af569bac39361652fbf",
+      "tree": "467606732bc2a6990131916122fd4d38f5c4780a",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "024c68bee57c466e34051cce241c294d51cafd25e062c6596ec8177860d7be1a",
+      "assets": []
+    },
+    {
+      "tag": "v7.1.0",
+      "release_id": 459395232,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.1.0",
+      "prerelease": false,
+      "commit": "7094d1b149697f366165ea756fb6cee9dbbac1fe",
+      "tree": "f1ac7cf7d06866da7ade9924cd0af240cc32b761",
+      "changelog_blob": "a84e6618408c29f552578c90e5e485fe19574d5a",
+      "manifest_blob": "c07066ea074c39ffe04cea3bb11668323e3f6d4a",
+      "notes_sha256": "014462ce4604ce295fce9e8663129118b9efe9a31e827ad68dec7e341692fbfd",
+      "assets": [
+        {
+          "id": 795834268,
+          "name": "certification.json",
+          "size": 574,
+          "digest": "sha256:7b24f0c2a85e21d5c512c234256710738454ff42fa5a5d52f753b746e5ee0bff"
+        }
+      ]
+    },
+    {
+      "tag": "v7.0.1",
+      "release_id": 458945396,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.0.1",
+      "prerelease": false,
+      "commit": "d1ccee5653cc6c1ac703e0f09ee73c4a2c1c8a8a",
+      "tree": "3c5bd2edb98fdcfe7f786807451bb2038ad07d72",
+      "changelog_blob": "ec0d67e057e5e7784ceb1f35259577c51f1d831c",
+      "manifest_blob": "11ad2ffbab12d5f6961b44dc9be5074965018169",
+      "notes_sha256": "e54008f8e88341f507555db62f19a773d18ae55940f859a474649c3b0c00a8e1",
+      "assets": []
+    },
+    {
+      "tag": "v7.0.0",
+      "release_id": 458943411,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v7.0.0",
+      "prerelease": false,
+      "commit": "70b0f83a10fde9174b949e92c9901de78e6e9086",
+      "tree": "77c7ec777374a7f1780f9407c0a1a2511881ad1e",
+      "changelog_blob": "741f324533ec48c7caab249b6e158789e71ddd5b",
+      "manifest_blob": "3246481a7dae5560d662d89b6923ecc3121dcbd5",
+      "notes_sha256": "94ca7f72ecc69e6907e6113562f36365d9c790f352ec423cf587f349e685dad1",
+      "assets": []
+    },
+    {
+      "tag": "v6.3.0",
+      "release_id": 458899608,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.3.0",
+      "prerelease": false,
+      "commit": "eeb9208b5e8d863c5606db275b9d53483d69cd6b",
+      "tree": "3e86828c1f15cc30c72d55a031e9a9686148777d",
+      "changelog_blob": "d2211d83588f0ccd75baa91a5f72807b55dcd5a1",
+      "manifest_blob": "a12c1c71e9577917821c1bd98964ad5d5e7fca0e",
+      "notes_sha256": "bbe5ed1b2ac05c745e46d6ceec3f857b9a5c801fa7857424b93214ffae42ff77",
+      "assets": []
+    },
+    {
+      "tag": "v6.2.1",
+      "release_id": 458898129,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.2.1",
+      "prerelease": false,
+      "commit": "e39cbc4984b2388be44a3c45a3ae3ca26b00a14b",
+      "tree": "6feefe1c4cf04ca60af83723ee9277bf9a862554",
+      "changelog_blob": "90affe05e1d861eecf40541547f51146b6451d54",
+      "manifest_blob": "0df986f186876bf01dbfbf9e69d976535d5746dc",
+      "notes_sha256": "5830aef03694a1a3135784e13dd5277c985c82099ee01ee9e63e11483aae524c",
+      "assets": []
+    },
+    {
+      "tag": "v6.2.0",
+      "release_id": 458894789,
+      "release_url": "https://github.com/TomasAlric/terraform-module-release-please-poc/releases/tag/v6.2.0",
+      "prerelease": false,
+      "commit": "6042bf2bff2cf45cba858c4bae677709120d6298",
+      "tree": "9cb343f3ec8fc570368b69f5a8e2e79eee00b94e",
+      "changelog_blob": "5debb37791c5a119fb55cffd6f61be40f7f802f2",
+      "manifest_blob": "a4f10c4956ff86534ef4e95a433763fa39d994e9",
+      "notes_sha256": "da5729d5777b06b261b406e188aa94e9333f744281615fb67fb3c4c50264a8f7",
+      "assets": []
+    }
+  ]
+}

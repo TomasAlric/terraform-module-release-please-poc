@@ -9,12 +9,15 @@ function command(program, args, input) {
 const git = (...args) => command('git', args);
 const gh = (...args) => command('gh', args);
 
+const { resolveStableBaseline } = require('./baseline.cjs');
+
 async function reconcile() {
   if (!process.env.GH_TOKEN) throw Error('Release credential required');
   const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
   const github = await GitHub.create({ owner, repo, token: process.env.GH_TOKEN });
   const manifest = await Manifest.fromManifest(github, 'main');
   const base = git('rev-parse', 'HEAD');
+  resolveStableBaseline(process.env.GITHUB_REPOSITORY, base);
   const candidates = await manifest.buildPullRequests();
   if (!candidates.length) return;
   if (candidates.length !== 1) throw Error('Expected one root package');

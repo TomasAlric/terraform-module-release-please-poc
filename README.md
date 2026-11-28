@@ -1,6 +1,6 @@
-# README — Continuous Infrastructure Certification (POC Fase 1 & Fase 2)
+# README — Continuous Infrastructure Certification (POC Fases 1, 2 & 3)
 
-Esta POC demonstra um fluxo completo de **automação, homologação contínua (Day 0 e Day 2) e publicação certificada** de módulos Terraform utilizando **Google Release Please** (`17.6.0`), **Terraform 1.6.6**, **GitHub Actions** e **GitHub Rulesets**.
+Esta POC demonstra um fluxo completo de **automação, homologação contínua (Day 0 e Day 2), hardening de segurança, adoção brownfield e publicação certificada** de módulos Terraform utilizando **Google Release Please** (`17.6.0`), **Terraform 1.6.6**, **GitHub Actions** e **GitHub Rulesets**.
 
 ## 1. Capacidades Homologadas
 
@@ -15,10 +15,14 @@ Esta POC demonstra um fluxo completo de **automação, homologação contínua (
   - **Comentário Automático Persistente** (`scripts/release/comment.cjs`): Comentário único no PR atualizado in-place (`PENDING` -> `PASS`/`FAIL`/`INVALIDATED`) em contexto privilegiado separado dos testes.
   - **Release Candidate Management** (`scripts/release/rc.cjs`): Criação de tags SemVer pre-release imutáveis (`vX.Y.Z-rc.prN.sha7`) com GitHub Pre-release (`prerelease: true`, `make_latest: false`), ou referências isoladas (`candidate/pr-N/sha7`) para PRs sem release.
   - **Fresh Installation Certification — Day 0** (`scripts/certify/run-day0.sh`): Consumo remoto real da referência candidata via `git::https://...?ref=<RC>`, validando instalação limpa (`defaults` e `custom`), contratos, idempotência e cleanup.
-  - **Consumer Upgrade Certification — Day 2** (`scripts/certify/run-day2.sh`): Provisionamento da versão estável (`v7.1.0`, `v7.1.1`, `v6.3.0`) e upgrade in-place para a RC utilizando o **mesmo diretório e mesmo Terraform state**, validando preservação de `lineage`, `cluster.id`, marcador de integridade de dados e idempotência pós-upgrade em 5 cenários de consumidores.
+  - **Consumer Upgrade Certification — Day 2** (`scripts/certify/run-day2.sh`): Provisionamento da versão estável e upgrade in-place para a RC utilizando o **mesmo diretório e mesmo Terraform state**, validando preservação de `lineage`, `cluster.id`, marcador de integridade de dados e idempotência pós-upgrade em 5 cenários de consumidores.
   - **Upgrade Impact Analysis** (`scripts/certify/analyze-plan.py`): Análise determinística do Terraform Plan JSON antes do `apply`, bloqueando substituições (`replace`) ou exclusões (`delete`) inesperadas de recursos críticos.
-  - **Reutilização Governada de Evidências**: Contrato criptográfico de equivalência de 8 dimensões (`equivalence_fingerprint`) e invalidação automática quando a `main` avança.
-  - **Certificado Ampliado (`certification.json` v2)**: Anexado a cada release estável com rastreabilidade completa do candidato, Day 0, Day 2, impacto de upgrade e árvore publicada.
+  - **Certificado Ampliado (`certification.json` v2/v3)**: Anexado a cada release estável com rastreabilidade completa do candidato, Day 0, Day 2, impacto de upgrade e árvore publicada.
+- **Fase 3 (H35–H45)**:
+  - **Hardening de Separação de Privilégios**: `.github/workflows/ci.yml` opera exclusivamente com `permissions: contents: read` e sem fallback de bootstrap; criação de candidatos isolada em `.github/workflows/candidate.yml` (código da base lendo apenas objetos Git) e comentário final isolado em `.github/workflows/certification-comment.yml` (`workflow_run`).
+  - **Validação Estrita de Baseline e Árvore Completa (`policy_version: 3`)**: `scripts/release/baseline.cjs` valida manifest, ancestralidade da tag, GitHub Release `Latest` e certificado antes de qualquer preview ou reconciliação; Day 0, Day 2 e fingerprint validam a árvore Git completa (`HEAD^{tree}`) com execução integral obrigatória (`reused: false`).
+  - **Recuperação Determinística de Publicação Parcial**: `scripts/release/publication.cjs` grava `proposal-sha256 <digest>` em tag Git anotada (`git mktag`) e verifica os bytes de `certification.json` antes e após o upload (`v7.2.1` publicada e auditada).
+  - **Homologação de Adoção Brownfield**: Suítes reproduzíveis para adoção em módulos legados (`scripts/release/tests/brownfield.cjs`), integridade (`integrity.cjs`), fault injection de recuperação (`recovery.cjs`) e replay negativo de verificação (`verify-snapshot.py`).
 
 ## 2. Testes Locais
 
@@ -26,23 +30,28 @@ Na raiz do checkout, execute:
 
 ```bash
 bash scripts/certify.sh
+node scripts/release/tests/brownfield.cjs
+node scripts/release/tests/integrity.cjs
+node scripts/release/tests/recovery.cjs
 ```
-
-O script verifica formatação HCL, inicializa e valida o módulo, executa os 19 testes de contrato (`terraform test`), valida o exemplo `examples/complete`, valida os manifests do Release Please e confere os hashes Git (`CI_POLICY`) exigidos pelo verificador pré-publicação.
 
 Para executar localmente as suítes de certificação Day 0 e Day 2 contra uma tag local:
 
 ```bash
-bash scripts/certify/run-day0.sh v7.2.0 /tmp/day0.json "file://$(pwd)"
-bash scripts/certify/run-day2.sh v7.1.1 v7.2.0 MINOR false true /tmp/day2.json "file://$(pwd)"
+bash scripts/certify/run-day0.sh v7.2.1 /tmp/day0.json "file://$(pwd)"
+bash scripts/certify/run-day2.sh v7.2.0 v7.2.1 PATCH false true /tmp/day2.json "file://$(pwd)"
 ```
 
 ## 3. Documentação Completa
 
+- [Guia de Adoção Brownfield em Módulos Existentes (Fase 3)](docs/brownfield-adoption.md)
+- [Revisão Independente e Hardening de Segurança (Fase 3)](docs/security-hardening.md)
+- [Guia de Integração Corporativa — EKS e ECS (Fase 3)](docs/corporate-integration-guide.md)
+- [Relatório Final de Homologação — Fase 3 (H35–H45)](docs/validation-report-phase-3.md)
 - [Arquitetura e Evolução Corporativa (EKS/ECS)](docs/architecture.md)
-- [Release Version Preview (Fase 1)](docs/release-version-preview.md)
-- [Release Candidate Management (Fase 2)](docs/release-candidate-management.md)
-- [Fresh Installation (Day 0), Consumer Upgrade (Day 2) & Upgrade Impact Analysis (Fases 3–5)](docs/consumer-upgrade-certification.md)
+- [Release Version Preview](docs/release-version-preview.md)
+- [Release Candidate Management](docs/release-candidate-management.md)
+- [Fresh Installation (Day 0), Consumer Upgrade (Day 2) & Upgrade Impact Analysis](docs/consumer-upgrade-certification.md)
 - [Operação, Governança e Manutenção](docs/release-management.md)
 - [Relatório de Homologação — Fase 1 (H01–H17)](docs/validation-report.md)
 - [Relatório de Homologação — Fase 2 (H18–H34)](docs/validation-report-phase-2.md)

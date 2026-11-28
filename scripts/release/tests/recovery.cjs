@@ -8,6 +8,7 @@ const { publish } = require('../publication.cjs');
 const repo = 'fixture/recovery';
 
 async function worker() {
+  if (process.env.FAULT === 'before-tag') throw Error('simulated failure before tag creation');
   await publish({ async createRelease({name, tag, notes, sha}) {
     const file = process.env.RELEASE_FILE;
     if (process.env.FAULT === 'after-tag') throw Error('simulated transport failure before release');
@@ -75,10 +76,15 @@ elif args[:2]!=['issue','edit']: sys.exit('unexpected command')
       assert.deepEqual(results.sort(),[0,1]);
     } else {
       assert.equal(await start(proposal,fault),1);
-      assert.ok(git('ls-remote','origin','refs/tags/v6.2.1^{}').startsWith(sha));
-      assert.equal(fs.existsSync(file),fault !== 'after-tag');
-      assert.equal(fs.existsSync(asset),fault === 'upload-timeout');
-      assert.equal(await start(divergent),1);
+      if (fault === 'before-tag') {
+        assert.equal(git('ls-remote','origin','refs/tags/v6.2.1'), '');
+        assert.equal(fs.existsSync(file), false);
+      } else {
+        assert.ok(git('ls-remote','origin','refs/tags/v6.2.1^{}').startsWith(sha));
+        assert.equal(fs.existsSync(file),fault !== 'after-tag');
+        assert.equal(fs.existsSync(asset),fault === 'upload-timeout');
+        assert.equal(await start(divergent),1);
+      }
       assert.equal(await start(proposal),0);
       assert.equal(await start(proposal),0);
       assert.deepEqual(JSON.parse(fs.readFileSync(asset)),proof);
@@ -92,5 +98,5 @@ elif args[:2]!=['issue','edit']: sys.exit('unexpected command')
 }
 (async () => {
   if (process.argv[2] === 'worker') return worker();
-  for (const fault of ['after-tag','after-release','upload-failed','upload-timeout','competing','different-commit']) await scenario(fault);
+  for (const fault of ['before-tag','after-tag','after-release','upload-failed','upload-timeout','competing','different-commit']) await scenario(fault);
 })().catch(error=>{console.error(error.message);process.exitCode=1;});
