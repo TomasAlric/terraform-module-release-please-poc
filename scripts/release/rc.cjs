@@ -50,13 +50,13 @@ function main() {
     }
     console.log(`Candidate tag ${tag} already exists at ${commitSha} (idempotent match).`);
   } else {
-    run('git', ['push', 'origin', `${commitSha}:${ref}`]);
+    run('gh', ['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=${ref}`, '-f', `sha=${commitSha}`]);
     const verifyRemote = run('git', ['ls-remote', 'origin', ref]).split(/\s+/)[0];
     if (verifyRemote !== commitSha) {
       throw new Error(`Post-push verification failed for ${ref}: got ${verifyRemote}`);
     }
     tagCreated = true;
-    console.log(`Created immutable candidate tag ${tag} -> ${commitSha}`);
+    console.log(`Created candidate tag ${tag} -> ${commitSha}`);
   }
 
   let prereleaseUrl = `https://github.com/${repo}/tree/${encodeURIComponent(tag)}`;
