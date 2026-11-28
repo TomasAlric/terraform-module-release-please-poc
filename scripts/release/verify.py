@@ -10,7 +10,7 @@ REPO = "TomasAlric/terraform-module-release-please-poc"
 BRANCH = "release-please--branches--main"
 CI_POLICY = {
     "scripts/release/preview.cjs": "a900086806b18a5dc563e47048daf933fcfb7903",
-    ".github/workflows/ci.yml": "ecfd294dde84145891aa2c5bc81bd46316cab559",
+    ".github/workflows/ci.yml": "7cee3eda812844af81096e9308973ae4ac471d3b",
     "scripts/certify.sh": "062e851fab50d0e46c7c639522affd663a078c31",
     "scripts/certify/analyze-plan.py": "e28894b8fbead601723aac633821755838556dc1",
     "scripts/certify/run-day0.sh": "e91c0476925caae04143f8879e080cc3ac22ead1",

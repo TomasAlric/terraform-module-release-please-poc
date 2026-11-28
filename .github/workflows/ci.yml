@@ -44,7 +44,7 @@ jobs:
             "$HEAD_SHA" "$TESTED_SHA"
       - name: Install pinned Release Please library
         run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
-      - name: Calculate release version preview and create candidate
+      - name: Calculate preview and verify the remote candidate
         id: preview
         env:
           GH_TOKEN: ${{ github.token }}
@@ -109,6 +109,12 @@ jobs:
             jq -n '{result: "FAIL", failure_reason: "Terraform module contract tests or policy verification failed."}' > "$RUNNER_TEMP/contracts.json"
             exit 1
           fi
+      - name: Exercise release controls with isolated local fixtures
+        run: |
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+          node scripts/release/tests/brownfield.cjs
+          node scripts/release/tests/integrity.cjs
+          node scripts/release/tests/recovery.cjs
       - name: Export contract test evidence
         id: emit_contracts
         if: always()
@@ -134,7 +140,7 @@ jobs:
         with:
           terraform_version: 1.6.6
           terraform_wrapper: false
-      - name: Execute or verify Day 0 Fresh Installation
+      - name: Execute Day 0 Fresh Installation
         env:
           CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}
         run: |
@@ -164,7 +170,7 @@ jobs:
         with:
           terraform_version: 1.6.6
           terraform_wrapper: false
-      - name: Execute or verify Day 2 Consumer Upgrade
+      - name: Execute Day 2 Consumer Upgrade
         env:
           STABLE_TAG: ${{ needs.prepare-candidate.outputs.stable_tag }}
           CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}

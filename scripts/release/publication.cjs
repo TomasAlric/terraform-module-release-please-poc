@@ -76,7 +76,8 @@ async function publish(github) {
     run('gh', 'release', 'upload', tag, file);
   }
   // Confirm bytes after upload as well as on retries, before marking publication complete.
-  if (run('gh', 'release', 'download', tag, '--pattern', 'certification.json', '--output', '-') !== expected.trim()) {
+  const uploaded = execFileSync('gh', ['release', 'download', tag, '--pattern', 'certification.json', '--output', '-']);
+  if (!uploaded.equals(Buffer.from(expected))) {
     throw Error('Uploaded certificate mismatch');
   }
   checkRef();
