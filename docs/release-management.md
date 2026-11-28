@@ -103,11 +103,12 @@ Sempre que `.github/workflows/ci.yml`, `scripts/certify.sh` ou qualquer script e
 2. Atualize o dicionário `CI_POLICY` em `scripts/release/verify.py`.
 3. Execute `bash scripts/certify.sh` localmente para confirmar que todos os hashes coincidem antes de abrir o PR.
 
-### Auditoria das releases da Fase 2
+### Auditoria das releases das Fases 1, 2 e 3
 
-O script `scripts/audit-release.py` é compatível tanto com as releases da Fase 1 (`policy_version: 1`) quanto com as releases da Fase 2 (`policy_version: 2`):
+O script `scripts/audit-release.py` é compatível com as releases da Fase 1 (`policy_version: 1`), da Fase 2 (`policy_version: 2`) e da Fase 3 (`policy_version: 3`, incluindo validação da tag anotada `proposal-sha256`):
 
 ```sh
 python3 scripts/audit-release.py v7.1.1 28 45989998572
 python3 scripts/audit-release.py v7.2.0 29 45991745368
+python3 scripts/audit-release.py v7.2.1 33 46111741239
 ```

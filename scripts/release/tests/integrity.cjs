@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { validateBaseline, computeEquivalenceContract } = require('../preview.cjs');
+const { validateBaseline } = require('../baseline.cjs');
+const { computeEquivalenceContract } = require('../preview.cjs');
 const original = process.cwd();
 const dir = fs.mkdtempSync(path.join(os.tmpdir(),'integrity-'));
 try {

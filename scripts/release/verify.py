@@ -9,7 +9,8 @@ import subprocess
 REPO = "TomasAlric/terraform-module-release-please-poc"
 BRANCH = "release-please--branches--main"
 CI_POLICY = {
-    "scripts/release/preview.cjs": "a900086806b18a5dc563e47048daf933fcfb7903",
+    "scripts/release/baseline.cjs": "0b5c25d9a60b267933eaf253ef4b7eae981a7103",
+    "scripts/release/preview.cjs": "0abc075e738774dbb61dbba021698213efea112c",
     ".github/workflows/ci.yml": "7cee3eda812844af81096e9308973ae4ac471d3b",
     "scripts/certify.sh": "062e851fab50d0e46c7c639522affd663a078c31",
     "scripts/certify/analyze-plan.py": "e28894b8fbead601723aac633821755838556dc1",

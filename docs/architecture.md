@@ -40,8 +40,12 @@ O CI separa estritamente a execução de código do PR das operações de escrit
    - Opera em modo somente leitura com `GITHUB_TOKEN`.
    - Valida a proteção do ruleset de `main`, os hashes Git (`CI_POLICY`) de `.github/workflows/ci.yml`, `scripts/certify.sh` e `scripts/certify/*`, a conclusão `success` de todos os 5 jobs obrigatórios antes do merge, a igualdade entre a árvore testada e a árvore do squash commit, e o registro `CERTIFICATION_EVIDENCE_JSON` assinado no log do job `Terraform certification`.
 
-## 3. Documentação detalhada da Fase 2
+## 3. Documentação detalhada das Fases 1, 2 e 3
 
+- [Guia de Adoção Brownfield em Módulos Existentes (Fase 3)](brownfield-adoption.md)
+- [Revisão Independente e Hardening de Segurança (Fase 3)](security-hardening.md)
+- [Guia de Integração Corporativa — EKS e ECS (Fase 3)](corporate-integration-guide.md)
+- [Relatório de Homologação Fase 3 (H35–H45)](validation-report-phase-3.md)
 - [Previsão de Versão e Comentário Automático](release-version-preview.md)
 - [Gerenciamento de Release Candidates (Alternativa A vs B)](release-candidate-management.md)
 - [Certificação Day 0 (Fresh Install), Day 2 (Consumer Upgrade) e Upgrade Impact Analysis](consumer-upgrade-certification.md)

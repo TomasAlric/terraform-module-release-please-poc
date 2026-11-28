@@ -1,5 +1,6 @@
 // Phase 1 & 7: Deterministic Release Version Preview and Equivalence Contract using Release Please.
 require('release-please');
+const { resolveStableBaseline } = require('./baseline.cjs');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { writeFileSync } = require('node:fs');
@@ -50,18 +51,6 @@ function classifyIncrement(currentStr, nextStr) {
   return 'NONE';
 }
 
-function validateBaseline(release, anchor, proof, repo, tag, sha, tree) {
-  if (release.tag_name !== tag || release.draft || release.prerelease) throw Error('Incomplete stable release');
-  if (anchor?.tag === tag) {
-    if (anchor.repository !== repo || anchor.release_id !== release.id || anchor.commit !== sha) {
-      throw Error('Manual baseline differs from reviewed adoption inventory');
-    }
-  } else if (release.target_commitish !== sha || proof?.repository !== repo || proof.version !== tag.slice(1) ||
-             proof.merge_commit !== sha || proof.certified_tree !== tree || proof.result !== 'success') {
-    throw Error('Stable certificate differs from published tag or manifest');
-  }
-}
-
 async function main() {
   const repo = process.env.GITHUB_REPOSITORY || 'TomasAlric/terraform-module-release-please-poc';
   const prNumber = Number(process.env.PR_NUMBER || 0);
@@ -77,24 +66,7 @@ async function main() {
 
   // 1. Discover current main and latest stable version dynamically
   const currentMainSha = run('git', ['rev-parse', 'origin/main']);
-  const manifestRaw = gitShowAt(currentMainSha, '.release-please-manifest.json');
-  const manifestJson = JSON.parse(manifestRaw);
-  const currentStableVersion = manifestJson['.'];
-  if (Object.keys(manifestJson).length !== 1 || typeof currentStableVersion !== 'string' ||
-      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(currentStableVersion)) {
-    throw Error('Invalid root stable manifest');
-  }
-  const currentStableTag = `v${currentStableVersion}`;
-  const stableTagSha = run('git', ['rev-parse', '--verify', `refs/tags/${currentStableTag}^{commit}`]);
-  run('git', ['merge-base', '--is-ancestor', stableTagSha, currentMainSha]);
-  const published = JSON.parse(run('gh', ['api', `repos/${repo}/releases/latest`]));
-  const anchorRaw = tryRun('git', ['show', `${currentMainSha}:.release/brownfield.json`]);
-  const anchor = anchorRaw ? JSON.parse(anchorRaw) : null;
-  const proof = anchor?.tag === currentStableTag ? null : JSON.parse(run('gh', [
-    'release', 'download', currentStableTag, '--repo', repo, '--pattern', 'certification.json', '--output', '-',
-  ]));
-  validateBaseline(published, anchor, proof, repo, currentStableTag, stableTagSha,
-    run('git', ['rev-parse', `${stableTagSha}^{tree}`]));
+  const { currentStableVersion, currentStableTag, stableTagSha } = resolveStableBaseline(repo, currentMainSha);
 
   // 2. Check base branch freshness & ancestry
   let isMainAncestorOfHead = false;
@@ -288,7 +260,7 @@ async function main() {
   console.log(jsonOutput);
 }
 
-module.exports = { computeEquivalenceContract, validateBaseline };
+module.exports = { computeEquivalenceContract };
 if (require.main === module) main().catch(err => {
   console.error(err);
   process.exitCode = 1;

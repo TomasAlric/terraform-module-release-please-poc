@@ -10,7 +10,7 @@ const { createHash } = require('node:crypto');
 const config = fs.readFileSync(path.join(__dirname, '../../../release-please-config.json'));
 const historical = ['6.0.0', '6.1.0', '6.1.1', '6.2.0'];
 
-async function scenario(label, messages, expected, tagOnly = false) {
+async function scenario(label, messages, expected, tagOnly = false, manifestVersion = '6.2.0') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brownfield-'));
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_DATE: '2024-01-01T00:00:00Z', GIT_COMMITTER_DATE: '2024-01-01T00:00:00Z' } }).trim();
@@ -39,7 +39,7 @@ async function scenario(label, messages, expected, tagOnly = false) {
     const before = JSON.stringify(inventory());
     const consumer = git('show', 'v6.1.1:main.tf');
     write('release-please-config.json', config);
-    write('.release-please-manifest.json', JSON.stringify({'.':'6.2.0'}));
+    write('.release-please-manifest.json', JSON.stringify({'.':manifestVersion}));
     fs.mkdirSync(path.join(dir,'.release'));
     write('.release/brownfield.json', JSON.stringify({repository:'fixture/module',tag:'v6.2.0',commit:git('rev-parse','v6.2.0'),release_id:4}));
     commit('ci: adopt release management');
@@ -62,7 +62,13 @@ async function scenario(label, messages, expected, tagOnly = false) {
     const output = path.join(bin,'preview.json');
     const result = spawnSync(process.execPath,[path.join(__dirname,'../preview.cjs'),output],{cwd:dir,env,encoding:'utf8'});
     let projected;
-    if (tagOnly) {
+    if (manifestVersion !== '6.2.0') {
+      assert.notEqual(result.status,0);
+      assert.match(result.stderr,/Incomplete stable release|couldn't find remote ref/);
+      assert.equal(JSON.stringify(inventory()),before);
+      console.log('PASS',label,'refused inconsistent manifest',manifestVersion);
+      return;
+    } else if (tagOnly) {
       assert.notEqual(result.status,0);
       assert.match(result.stderr,/Incomplete stable release/);
     } else {
@@ -111,5 +117,7 @@ async function scenario(label, messages, expected, tagOnly = false) {
     ['major',['feat!: remove old output'],'7.0.0'], ['docs',['docs: explain inputs'],null],
     ['no change',[],null], ['accumulated',['Legacy adjustment','fix: repair output','feat: extend output'],'6.3.0'],
     ['tag only',['fix: repair output'],'6.2.1',true],
+    ['inconsistent manifest (stale 6.1.0)',['fix: repair output'],null,false,'6.1.0'],
+    ['inconsistent manifest (missing tag 6.2.5)',['fix: repair output'],null,false,'6.2.5'],
   ]) await scenario(...args);
 })().catch(error => { console.error(error); process.exitCode = 1; });

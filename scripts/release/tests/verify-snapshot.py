@@ -22,9 +22,12 @@ with patch.object(verify, "command", command):
 assert control["result"] == "success"
 
 for case in ("cancelled", "failed", "other workflow", "other head", "other attempt",
-             "missing job", "incomplete evidence", "marker outside gate", "other metadata", "stale candidate ref"):
+             "missing job", "incomplete evidence", "marker outside gate", "other metadata",
+             "stale candidate ref", "reused evidence", "unreviewed policy"):
     def replay(*args):
         value = command(*args)
+        if args[:2] == ("git", "rev-parse") and case == "unreviewed policy" and args[2].endswith(":scripts/certify.sh"):
+            return "0" * 40
         if args[:2] == ("gh", "api"):
             data = json.loads(value)
             if "workflow_runs" in data:
@@ -47,6 +50,8 @@ for case in ("cancelled", "failed", "other workflow", "other head", "other attem
                 return value.replace("Evaluate Infrastructure Certification Gate\t", "Other step\t")
             if case == "other attempt":
                 return value.replace('"attempt":"1"', '"attempt":"0"')
+            if case == "reused evidence":
+                return value.replace('"reused":false', '"reused":true')
         if args[:2] == ("git", "ls-remote") and case == "stale candidate ref":
             return ""
         return value
