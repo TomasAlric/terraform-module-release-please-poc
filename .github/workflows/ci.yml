@@ -15,24 +15,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
-      contents: write
-      pull-requests: write
-      actions: read
+      contents: read
+      pull-requests: read
     outputs:
       candidate_tag: ${{ steps.preview.outputs.candidate_tag }}
       stable_tag: ${{ steps.preview.outputs.stable_tag }}
       release_type: ${{ steps.preview.outputs.release_type }}
       declared_breaking: ${{ steps.preview.outputs.declared_breaking }}
       migration_doc_present: ${{ steps.preview.outputs.migration_doc_present }}
-      evidence_reused: ${{ steps.preview.outputs.evidence_reused }}
       preview_json: ${{ steps.preview.outputs.preview_json }}
     steps:
       - name: Checkout trusted main baseline
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/heads/main
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
       - name: Fetch PR commits as Git objects without checkout
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -44,10 +42,6 @@ jobs:
             "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/head" \
             "+refs/pull/${PR_NUMBER}/merge:refs/remotes/pull/merge" \
             "$HEAD_SHA" "$TESTED_SHA"
-          if [[ ! -f scripts/release/preview.cjs ]]; then
-            test "${{ github.event.pull_request.user.id }}" = "82914085"
-            git checkout "$TESTED_SHA" -- scripts/release scripts/certify
-          fi
       - name: Install pinned Release Please library
         run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
       - name: Calculate release version preview and create candidate
@@ -62,19 +56,22 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_REF: ${{ github.head_ref }}
           TESTED_SHA: ${{ github.sha }}
-          DISABLE_EVIDENCE_REUSE: ${{ vars.DISABLE_EVIDENCE_REUSE }}
-          ENABLE_PR_EVIDENCE_REUSE: ${{ vars.ENABLE_PR_EVIDENCE_REUSE }}
         run: |
           node scripts/release/preview.cjs "$RUNNER_TEMP/preview.json"
-          node scripts/release/rc.cjs "$RUNNER_TEMP/preview.json"
-          node scripts/release/comment.cjs pending "$RUNNER_TEMP/preview.json"
+          ref="refs/tags/$(jq -r '.candidate_tag' "$RUNNER_TEMP/preview.json")"
+          expected="$(jq -r '.candidate_commit_sha' "$RUNNER_TEMP/preview.json")"
+          for attempt in {1..45}; do
+            actual="$(git ls-remote origin "$ref" | cut -f1)"
+            [[ -n "$actual" ]] && break
+            sleep 3
+          done
+          test "$actual" = "$expected"
           {
             echo "candidate_tag=$(jq -r '.candidate_tag' "$RUNNER_TEMP/preview.json")"
             echo "stable_tag=$(jq -r '.current_stable_tag' "$RUNNER_TEMP/preview.json")"
             echo "release_type=$(jq -r '.release_type' "$RUNNER_TEMP/preview.json")"
             echo "declared_breaking=$(jq -r '.declared_breaking' "$RUNNER_TEMP/preview.json")"
             echo "migration_doc_present=$(jq -r '.migration_doc_present' "$RUNNER_TEMP/preview.json")"
-            echo "evidence_reused=$(jq -r '.evidence_reuse.reused' "$RUNNER_TEMP/preview.json")"
             echo "preview_json=$(jq -c '.' "$RUNNER_TEMP/preview.json")"
           } >> "$GITHUB_OUTPUT"
 
@@ -140,37 +137,8 @@ jobs:
       - name: Execute or verify Day 0 Fresh Installation
         env:
           CANDIDATE_TAG: ${{ needs.prepare-candidate.outputs.candidate_tag }}
-          EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
-          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
         run: |
-          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
-          if [[ "$EVIDENCE_REUSED" == "true" ]]; then
-            verify_dir="$(mktemp -d)"
-            git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
-            local_hash="$(shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
-            remote_hash="$(cd "$verify_dir" && shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
-            rm -rf "$verify_dir"
-            test "$local_hash" = "$remote_hash"
-            source_run="$(jq -r '.evidence_reuse.source_run_id' "$RUNNER_TEMP/preview.json")"
-            jq -n \
-              --arg ref "$CANDIDATE_TAG" \
-              --arg hash "$remote_hash" \
-              --arg source_run "$source_run" \
-              '{
-                result: "PASS",
-                fresh_installation: "PASS",
-                terraform_contracts: "PASS",
-                idempotency: "PASS",
-                cleanup: "PASS",
-                candidate_ref: $ref,
-                expected_module_hash: $hash,
-                reused_from_run_id: $source_run,
-                failure_reason: null,
-                scenarios: []
-              }' > "$RUNNER_TEMP/day0.json"
-          else
-            bash scripts/certify/run-day0.sh "$CANDIDATE_TAG" "$RUNNER_TEMP/day0.json"
-          fi
+          bash scripts/certify/run-day0.sh "$CANDIDATE_TAG" "$RUNNER_TEMP/day0.json"
       - name: Export Day 0 evidence
         id: emit_day0
         if: always()
@@ -203,49 +171,15 @@ jobs:
           RELEASE_TYPE: ${{ needs.prepare-candidate.outputs.release_type }}
           DECLARED_BREAKING: ${{ needs.prepare-candidate.outputs.declared_breaking }}
           MIGRATION_DOC_PRESENT: ${{ needs.prepare-candidate.outputs.migration_doc_present }}
-          EVIDENCE_REUSED: ${{ needs.prepare-candidate.outputs.evidence_reused }}
-          PREVIEW_JSON: ${{ needs.prepare-candidate.outputs.preview_json }}
           SIMULATE_CLEANUP_FAILURE: ${{ vars.SIMULATE_CLEANUP_FAILURE }}
         run: |
-          printf '%s\n' "$PREVIEW_JSON" > "$RUNNER_TEMP/preview.json"
-          if [[ "$EVIDENCE_REUSED" == "true" && "${SIMULATE_CLEANUP_FAILURE:-false}" != "true" ]]; then
-            verify_dir="$(mktemp -d)"
-            git clone --depth 1 --branch "$CANDIDATE_TAG" "https://github.com/${{ github.repository }}.git" "$verify_dir"
-            local_hash="$(shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
-            remote_hash="$(cd "$verify_dir" && shasum -a 256 main.tf variables.tf outputs.tf versions.tf | shasum -a 256 | awk '{print $1}')"
-            rm -rf "$verify_dir"
-            test "$local_hash" = "$remote_hash"
-            jq \
-              --arg stable "$STABLE_TAG" \
-              --arg candidate "$CANDIDATE_TAG" \
-              '{
-                result: "PASS",
-                consumer_upgrade: "PASS",
-                upgrade_impact_policy: "PASS",
-                post_upgrade_idempotency: "PASS",
-                cleanup: "PASS",
-                stable_tag: $stable,
-                candidate_ref: $candidate,
-                reused_from_run_id: (.evidence_reuse.source_run_id | tostring),
-                upgrade_impact: (.evidence_reuse.source_upgrade_impact // {create: 0, update: 0, replace: 0, delete: 0}),
-                upgrade_policy_details: {
-                  critical_resource_preservation: "PASS",
-                  contract_compatibility: "PASS",
-                  upgrade_authorization: "PASS"
-                },
-                failure_reason: null,
-                violations: [],
-                scenarios: []
-              }' "$RUNNER_TEMP/preview.json" > "$RUNNER_TEMP/day2.json"
-          else
-            bash scripts/certify/run-day2.sh \
+          bash scripts/certify/run-day2.sh \
               "$STABLE_TAG" \
               "$CANDIDATE_TAG" \
               "$RELEASE_TYPE" \
               "$DECLARED_BREAKING" \
               "$MIGRATION_DOC_PRESENT" \
               "$RUNNER_TEMP/day2.json"
-          fi
       - name: Export Day 2 evidence
         id: emit_day2
         if: always()
@@ -316,37 +250,3 @@ jobs:
         run: |
           echo "Terraform 1.6.6 · $RESULT · PR head $HEAD · merge $GITHUB_SHA · tree $(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_STEP_SUMMARY"
           git rev-parse 'HEAD^{tree}'
-
-  publish-comment:
-    name: Publish Release Impact Comment
-    needs: [prepare-candidate, contracts]
-    if: always() && github.repository == 'TomasAlric/terraform-module-release-please-poc'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout trusted main baseline
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: refs/heads/main
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Load trusted comment publisher
-        env:
-          TESTED_SHA: ${{ github.sha }}
-        run: |
-          if [[ ! -f scripts/release/comment.cjs ]]; then
-            test "${{ github.event.pull_request.user.id }}" = "82914085"
-            git fetch origin "$TESTED_SHA"
-            git checkout "$TESTED_SHA" -- scripts/release
-          fi
-      - name: Update persistent PR comment
-        if: needs.contracts.outputs.gate_report_json != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GATE_REPORT_JSON: ${{ needs.contracts.outputs.gate_report_json }}
-        run: |
-          printf '%s\n' "$GATE_REPORT_JSON" > "$RUNNER_TEMP/gate-report.json"
-          node scripts/release/comment.cjs final "$RUNNER_TEMP/gate-report.json"
