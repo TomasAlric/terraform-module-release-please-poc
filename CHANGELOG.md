@@ -1,5 +1,12 @@
 # Changelog
 
+## [7.2.1](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.2.0...v7.2.1) (2026-11-28)
+
+
+### Correções
+
+* certify the complete downloaded module tree before publication ([#32](https://github.com/TomasAlric/terraform-module-release-please-poc/issues/32)) ([6c8a24b](https://github.com/TomasAlric/terraform-module-release-please-poc/commit/6c8a24ba9907119e4300e92a547a87ff476194e4))
+
 ## [7.2.0](https://github.com/TomasAlric/terraform-module-release-please-poc/compare/v7.1.1...v7.2.0) (2026-11-27)
 
 
