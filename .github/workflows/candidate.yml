@@ -1,0 +1,40 @@
+name: Prepare remote candidate
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+permissions: {}
+concurrency:
+  group: remote-candidate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  prepare:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.repository == 'TomasAlric/terraform-module-release-please-poc'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Prepare reference from Git objects using base-branch tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git fetch origin "refs/pull/$PR_NUMBER/merge" "refs/heads/main:refs/remotes/origin/main"
+          export TESTED_SHA="$(git rev-parse FETCH_HEAD)"
+          test "$(git show -s --format=%P "$TESTED_SHA")" = "$PR_BASE_SHA $PR_HEAD_SHA"
+          node scripts/release/preview.cjs "$RUNNER_TEMP/preview.json"
+          node scripts/release/rc.cjs "$RUNNER_TEMP/preview.json"
+          node scripts/release/comment.cjs pending "$RUNNER_TEMP/preview.json"

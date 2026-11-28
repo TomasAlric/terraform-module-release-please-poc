@@ -2,8 +2,7 @@
 require('release-please');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { existsSync, readFileSync, writeFileSync } = require('node:fs');
-const { join } = require('node:path');
+const { writeFileSync } = require('node:fs');
 const { TerraformModule } = require('release-please/build/src/strategies/terraform-module');
 const { parseConventionalCommits } = require('release-please/build/src/commit');
 const { TagName } = require('release-please/build/src/util/tag-name');
@@ -25,68 +24,18 @@ function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
-function gitBlobAt(ref, filePath) {
-  try {
-    return run('git', ['rev-parse', `${ref}:${filePath}`]);
-  } catch {
-    return null;
-  }
-}
-
 function gitShowAt(ref, filePath) {
   return run('git', ['show', `${ref}:${filePath}`]);
 }
 
-function computeEquivalenceContract(ref, stableVersion, stableTagSha, workspaceRoot) {
-  const functionalPaths = [
-    'main.tf',
-    'variables.tf',
-    'outputs.tf',
-    'versions.tf',
-    'tests/contract.tftest.hcl',
-    'examples/complete/main.tf',
-  ];
-  const functionalEntries = functionalPaths.map(p => `${p}:${gitBlobAt(ref, p) || 'missing'}`);
-  const functionalModuleTree = sha256(functionalEntries.join('\n'));
-
-  const lockContent = tryRun('git', ['show', `${ref}:scripts/release/package-lock.json`]) ||
-    (existsSync(join(workspaceRoot, 'scripts/release/package-lock.json'))
-      ? readFileSync(join(workspaceRoot, 'scripts/release/package-lock.json'), 'utf8')
-      : '');
-  const dependenciesLockHash = sha256(`terraform:1.6.6\n${lockContent}`);
-
-  const readScript = relPath => {
-    const fromGit = tryRun('git', ['show', `${ref}:${relPath}`]);
-    if (fromGit !== null) return fromGit;
-    const full = join(workspaceRoot, relPath);
-    return existsSync(full) ? readFileSync(full, 'utf8') : '';
-  };
-
-  const consumerFixturesHash = sha256(
-    readScript('scripts/certify/run-day0.sh') + '\n---\n' + readScript('scripts/certify/run-day2.sh')
-  );
-  const testPolicyHash = sha256(
-    readScript('scripts/certify.sh') + '\n---\n' + readScript('scripts/certify/analyze-plan.py')
-  );
-  const terraformConfigHash = sha256(
-    `${gitShowAt(ref, 'versions.tf')}\n${gitShowAt(ref, 'release-please-config.json')}`
-  );
-  const originStableVersion = `v${stableVersion}@${stableTagSha}`;
-  const environmentParameters = 'linux-x86_64:terraform-1.6.6:builtin-provider';
-
+// Informational digest only. Every candidate executes the full certification.
+function computeEquivalenceContract(ref, version, stableSha) {
   const contract = {
-    functional_module_tree: functionalModuleTree,
-    dependencies_lock_hash: dependenciesLockHash,
-    consumer_fixtures_hash: consumerFixturesHash,
-    terraform_config_hash: terraformConfigHash,
-    test_policy_hash: testPolicyHash,
-    origin_stable_version: originStableVersion,
-    environment_parameters: environmentParameters,
+    repository_tree: run('git', ['rev-parse', `${ref}^{tree}`]),
+    origin_stable_version: `v${version}@${stableSha}`,
+    environment_parameters: 'linux-x86_64:terraform-1.6.6:builtin-provider',
   };
-  return {
-    contract,
-    fingerprint: sha256(JSON.stringify(contract)),
-  };
+  return { contract, fingerprint: sha256(JSON.stringify(contract)) };
 }
 
 function classifyIncrement(currentStr, nextStr) {
@@ -97,125 +46,6 @@ function classifyIncrement(currentStr, nextStr) {
   if (next.minor > current.minor) return 'MINOR';
   if (next.patch > current.patch) return 'PATCH';
   return 'NONE';
-}
-
-function evaluateEvidenceReuse(repo, isReleasePr, headSha, baseSha, stableTagSha, currentEq) {
-  if (process.env.DISABLE_EVIDENCE_REUSE === 'true') {
-    return {
-      reused: false,
-      eligible: false,
-      reason: 'Evidence reuse explicitly disabled via DISABLE_EVIDENCE_REUSE=true',
-    };
-  }
-  if (!isReleasePr && process.env.ENABLE_PR_EVIDENCE_REUSE !== 'true') {
-    return {
-      reused: false,
-      eligible: false,
-      reason: 'Feature PRs execute full certification to produce primary evidence',
-    };
-  }
-  if (!process.env.GH_TOKEN) {
-    return {
-      reused: false,
-      eligible: false,
-      reason: 'No GitHub token available to verify authenticated prior runs',
-    };
-  }
-
-  try {
-    // Check commits on main since stableTagSha to find the most recent commit that touched functional files
-    const commitsRaw = tryRun('git', ['log', '--format=%H', `${stableTagSha}..${baseSha}`]);
-    const mainCommits = commitsRaw ? commitsRaw.split('\n').filter(Boolean) : [];
-    if (!mainCommits.length) {
-      return {
-        reused: false,
-        eligible: false,
-        reason: 'No merged commits found on main since latest stable release',
-      };
-    }
-
-    // Query recent successful pull_request runs of ci.yml
-    const runsJson = JSON.parse(
-      run('gh', ['api', `repos/${repo}/actions/workflows/ci.yml/runs?event=pull_request&status=completed&per_page=15`])
-    );
-    const runs = (runsJson.workflow_runs || []).filter(
-      r => r.conclusion === 'success' && r.head_sha !== headSha && r.head_repository?.full_name === repo
-    );
-
-    const divergenceReasons = [];
-    for (const candidateRun of runs) {
-      const log = tryRun('gh', [
-        'run',
-        'view',
-        String(candidateRun.id),
-        '--repo',
-        repo,
-        '--attempt',
-        String(candidateRun.run_attempt || 1),
-        '--log',
-      ]);
-      if (!log) continue;
-      const matches = log.match(/CERTIFICATION_EVIDENCE_JSON=(\{[^\r\n]+\})/);
-      if (!matches) continue;
-      let evidence;
-      try {
-        evidence = JSON.parse(matches[1]);
-      } catch {
-        continue;
-      }
-      if (evidence.certification?.result !== 'PASS') continue;
-      const priorEq = evidence.equivalence_contract;
-      if (!priorEq) continue;
-
-      const diffs = [];
-      for (const key of [
-        'functional_module_tree',
-        'dependencies_lock_hash',
-        'consumer_fixtures_hash',
-        'terraform_config_hash',
-        'test_policy_hash',
-        'origin_stable_version',
-        'environment_parameters',
-      ]) {
-        if (priorEq[key] !== currentEq.contract[key]) {
-          diffs.push(`${key} diverged (${priorEq[key]?.slice(0, 10)} != ${currentEq.contract[key]?.slice(0, 10)})`);
-        }
-      }
-
-      if (diffs.length === 0) {
-        return {
-          reused: true,
-          eligible: true,
-          reason: `Proven 100% equivalence with authenticated run #${candidateRun.id} (candidate ${evidence.release_candidate?.reference})`,
-          source_run_id: candidateRun.id,
-          source_run_attempt: candidateRun.run_attempt || 1,
-          source_pr_number: evidence.pr_number,
-          source_candidate: evidence.release_candidate,
-          source_upgrade_impact: evidence.upgrade_impact,
-          source_certification: evidence.certification,
-          equivalence_fingerprint: currentEq.fingerprint,
-          verified_criteria: Object.keys(currentEq.contract),
-        };
-      } else {
-        divergenceReasons.push(`Run #${candidateRun.id}: ${diffs.join(', ')}`);
-      }
-    }
-
-    return {
-      reused: false,
-      eligible: false,
-      reason: divergenceReasons.length
-        ? `Equivalence rejected — divergence detected: ${divergenceReasons[0]}`
-        : 'No prior authenticated run with matching equivalence contract found',
-      divergences: divergenceReasons.slice(0, 3),
-    };
-  } catch (err) {
-    return {
-      reused: false,
-      eligible: false,
-      reason: `Equivalence verification failed safely (forcing full recertification): ${err.message}`,
-    };
-  }
 }
 
 async function main() {
@@ -229,22 +59,26 @@ async function main() {
   const headRef = (process.env.PR_HEAD_REF || '').trim();
   const runId = String(process.env.GITHUB_RUN_ID || 'local');
   const runAttempt = String(process.env.GITHUB_RUN_ATTEMPT || '1');
-  const workspaceRoot = process.env.WORKSPACE_ROOT || process.cwd();
   const outputPath = process.argv[2] || '';
 
   // 1. Discover current main and latest stable version dynamically
-  const currentMainSha = tryRun('git', ['rev-parse', 'origin/main']) || baseSha;
+  const currentMainSha = run('git', ['rev-parse', 'origin/main']);
   const manifestRaw = gitShowAt(currentMainSha, '.release-please-manifest.json');
   const manifestJson = JSON.parse(manifestRaw);
   const currentStableVersion = manifestJson['.'];
-  if (!currentStableVersion) {
-    throw new Error('Could not discover current stable version from .release-please-manifest.json');
+  if (Object.keys(manifestJson).length !== 1 || typeof currentStableVersion !== 'string' ||
+      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(currentStableVersion)) {
+    throw Error('Invalid root stable manifest');
   }
   const currentStableTag = `v${currentStableVersion}`;
-  const stableTagSha =
-    tryRun('git', ['rev-parse', `refs/tags/${currentStableTag}^{commit}`]) ||
-    tryRun('git', ['rev-parse', `${currentStableTag}^{commit}`]) ||
-    currentMainSha;
+  const stableTagSha = run('git', ['rev-parse', '--verify', `refs/tags/${currentStableTag}^{commit}`]);
+  run('git', ['merge-base', '--is-ancestor', stableTagSha, currentMainSha]);
+  const published = JSON.parse(run('gh', ['api', `repos/${repo}/releases/latest`]));
+  if (published.tag_name !== currentStableTag || published.draft || published.prerelease ||
+      published.target_commitish !== stableTagSha ||
+      !published.assets.some(asset => asset.name === 'certification.json' && asset.state === 'uploaded')) {
+    throw Error('Stable release is incomplete or inconsistent with manifest and tag. Reconcile publication.');
+  }
 
   // 2. Check base branch freshness & ancestry
   let isMainAncestorOfHead = false;
@@ -260,12 +94,12 @@ async function main() {
     : null;
 
   // 3. Collect commits integrated into main since the latest stable tag
-  const logShasRaw = tryRun('git', ['log', '--format=%H', `${stableTagSha}..${currentMainSha}`]);
+  const logShasRaw = run('git', ['log', '--format=%H', `${stableTagSha}..${currentMainSha}`]);
   const mainCommitShas = logShasRaw ? logShasRaw.split('\n').filter(Boolean) : [];
   const accumulatedCommits = mainCommitShas.map(sha => {
     const message = run('git', ['log', '-1', '--format=%B', sha]);
-    const filesRaw = tryRun('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', sha]);
-    const files = filesRaw ? filesRaw.split('\n').filter(Boolean) : ['main.tf'];
+    const filesRaw = run('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', sha]);
+    const files = filesRaw ? filesRaw.split('\n').filter(Boolean) : [];
     return { sha, message, files };
   });
 
@@ -291,13 +125,13 @@ async function main() {
   // 5. Evaluate PR commit & combined commits
   const isReleasePr = headRef === 'release-please--branches--main';
   const squashMessage = prBody ? `${prTitle}\n\n${prBody}` : prTitle;
-  const changedFilesRaw = tryRun('git', ['diff', '--name-only', `${baseSha}...${headSha}`]);
-  const changedFiles = changedFilesRaw ? changedFilesRaw.split('\n').filter(Boolean) : ['main.tf'];
+  const changedFilesRaw = run('git', ['diff', '--name-only', `${baseSha}...${headSha}`]);
+  const changedFiles = changedFilesRaw ? changedFilesRaw.split('\n').filter(Boolean) : [];
 
   const prRawCommit = {
     sha: headSha,
     message: squashMessage,
-    files: changedFiles.length ? changedFiles : ['main.tf'],
+    files: changedFiles,
   };
 
   const parsedPrCommits = parseConventionalCommits([prRawCommit]);
@@ -323,17 +157,9 @@ async function main() {
   const combinedConventional = parseConventionalCommits(combinedRawCommits);
   const releasePrCandidate = await strategy.buildReleasePullRequest(combinedConventional, baselineRelease);
 
-  let expectedNextVersion = releasePrCandidate?.version?.toString() || null;
-  if (isReleasePr && !expectedNextVersion) {
-    // Fallback to manifest on the Release PR branch if already updated
-    try {
-      const prManifest = JSON.parse(gitShowAt(headSha, '.release-please-manifest.json'));
-      if (prManifest['.'] && prManifest['.'] !== currentStableVersion) {
-        expectedNextVersion = prManifest['.'];
-      }
-    } catch {
-      // ignore
-    }
+  const expectedNextVersion = releasePrCandidate?.version?.toString() || null;
+  if (isReleasePr && JSON.parse(gitShowAt(headSha, '.release-please-manifest.json'))['.'] !== expectedNextVersion) {
+    throw Error('Release PR manifest diverges from accumulated changes');
   }
 
   // Also check if PR alone triggers a release
@@ -404,20 +230,14 @@ async function main() {
   }
 
   // 7. Compute Equivalence Contract & Reuse Evaluation
-  const eq = computeEquivalenceContract(candidateCommitSha, currentStableVersion, stableTagSha, workspaceRoot);
-  const evidenceReuse = evaluateEvidenceReuse(
-    repo,
-    isReleasePr,
-    headSha,
-    currentMainSha,
-    stableTagSha,
-    eq
-  );
+  const eq = computeEquivalenceContract(candidateCommitSha, currentStableVersion, stableTagSha);
+  const evidenceReuse = { reused: false, eligible: false, reason: 'Full certification required for every candidate' };
 
   const preview = {
     repository: repo,
     pr_number: prNumber,
     pr_title: prTitle,
+    metadata_digest: sha256(JSON.stringify([prTitle, prBody])),
     head_ref: headRef,
     is_release_pr: isReleasePr,
     current_stable_version: currentStableVersion,
@@ -448,7 +268,7 @@ async function main() {
     stale_reason: staleReason,
     workflow_run_id: runId,
     workflow_run_attempt: runAttempt,
-    policy_version: 2,
+    policy_version: 3,
     equivalence_contract: eq.contract,
     equivalence_fingerprint: eq.fingerprint,
     evidence_reuse: evidenceReuse,
